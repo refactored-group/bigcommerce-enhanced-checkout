@@ -1,0 +1,23 @@
+<script>
+    window.FFLStorefrontApiToken = '{{settings.storefront_api.token}}';
+    window.FFLCheckoutId = '{{checkout.id}}';
+
+    fetch('https://automaticffl.pages.dev/js/bigcommerce.js', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/javascript'
+        },
+        mode: 'cors',
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Error on loading the script');
+        }
+        return response.text();
+    }).then(scriptContent => {
+        const script = document.createElement('script');
+        script.textContent = scriptContent;
+        document.head.appendChild(script);
+    }).catch(error => {
+        console.error('Erro:', error);
+    });
+</script>

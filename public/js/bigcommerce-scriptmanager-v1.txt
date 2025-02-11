@@ -1,0 +1,12 @@
+<script>
+    window.FFLStorefrontApiToken = '{{settings.storefront_api.token}}';
+    window.FFLCheckoutId = '{{checkout.id}}';
+
+    document.head.appendChild(
+        Object.assign(document.createElement('script'), {
+            src: 'https://automaticffl.pages.dev/js/bigcommerce.js',
+            type: 'text/javascript',
+            mode: 'cors'
+        })
+    );
+</script>
