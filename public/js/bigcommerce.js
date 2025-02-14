@@ -1,6 +1,7 @@
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
+    googleMapsKey: window.FFLGoogleMapsKey,
     storeHash: null,
     isGuestUser: true,
     preventSubmition: false,
@@ -16,8 +17,8 @@ let FFLConfigs = {
     hasNonFFLProducts: false,
     platform: 'BigCommerce',
     automaticFFLStoreInfoEndpointUrl: 'https://app-stage.automaticffl.com/store-front/api/stores/',
-    automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
-    // automaticFFLIframeUrl: 'http://localhost:3000',
+    // automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
+    automaticFFLIframeUrl: 'http://localhost:3000',
     previousAddressState: null,
     shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
     shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
@@ -488,7 +489,7 @@ async function addFFLCheckoutStep() {
 
     let fflTemplate = htmlTemplates.fflStep.replace('%items%', itemsHTML)
         .replace('%fflInfo%', htmlTemplates.fflInfo);
-    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}`);
+    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}&maps_api_key=${FFLConfigs.googleMapsKey}`);
     const wrapperElement = document.createElement('li');
     wrapperElement.classList.add('checkout-step', 'optimizedCheckout-checkoutStep', 'checkout-step--shipping-ffl', 'ffl-items');
     wrapperElement.style.display = 'none';

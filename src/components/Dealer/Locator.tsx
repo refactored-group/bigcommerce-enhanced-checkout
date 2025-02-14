@@ -5,7 +5,7 @@ import LocatorMap from './components/LocatorMap/LocatorMap';
 import DealerCard from './components/Locator/DealerCard';
 import Search from './components/Search/Search';
 import './assets/styles.scss';
-// import dealers from './dealer.json'; #enable this line to use mock data
+// import dealers from './dealer.json'; //enable this line to use mock data
 
 interface LocatorProps {
   storeHash: any;
@@ -31,7 +31,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
 
     this.state = {
       dealers: [],
-      // dealers: dealers.dealers, #enable this line to use mock data
+      // dealers: dealers.dealers, //enable this line to use mock data
       searched: false,
       loading: false,
       location: "",
