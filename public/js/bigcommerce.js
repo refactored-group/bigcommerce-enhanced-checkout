@@ -16,8 +16,8 @@ let FFLConfigs = {
     hasNonFFLProducts: false,
     platform: 'BigCommerce',
     automaticFFLStoreInfoEndpointUrl: 'https://app-stage.automaticffl.com/store-front/api/stores/',
-    // automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
-    automaticFFLIframeUrl: 'http://localhost:3000',
+    automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
+    // automaticFFLIframeUrl: 'http://localhost:3000',
     previousAddressState: null,
     shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
     shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
@@ -74,6 +74,15 @@ let FFLConfigs = {
         max-width: 85%;
         max-height: 85%;
         overflow: visible;
+        @media (max-width: 551px) {
+          transform: none;
+          max-width: 100%;
+          min-height: initial;
+          bottom: 0;
+          max-height: 90%;
+          height: 90%;
+          top: initial;
+        }
       }
       #ffl-message-iframe-close {
         width: 22px;
@@ -81,12 +90,19 @@ let FFLConfigs = {
         right: 0;
         margin: -10px;
         cursor: pointer;
+        @media (max-width: 551px) {
+          margin: -13px 5px;
+        }
       }
       #ffl-message-iframe-modal .modal-content {
         width: 100%;
         height: 100%;
         overflow: hidden;
         border-radius: 6px;
+        @media (max-width: 551px) {
+          border-bottom-left-radius: 0;
+          border-bottom-right-radius: 0;
+        }
       }
       #alertDeliveryInfo {
         background-color: #feffd7;

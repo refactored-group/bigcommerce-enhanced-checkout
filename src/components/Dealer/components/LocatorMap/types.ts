@@ -1,9 +1,11 @@
 export interface IProps {
     apiKey: string;
     dealers: any[];
-    selectDealer: any;
-    setActiveDealer: any;
-}
+    selectDealer: (dealer: any) => void;
+    setActiveDealer: (dealer: any) => void;
+    showMap: boolean;
+    handleActiveDealer: (dealer: any) => void;
+  }
 
 export interface IMarkersProps {
     dealers: any[];
@@ -12,4 +14,5 @@ export interface IMarkersProps {
     selectDealer: any;
     prevDealersRef: any;
     setActiveDealer: any;
+    showMap: any
 }
