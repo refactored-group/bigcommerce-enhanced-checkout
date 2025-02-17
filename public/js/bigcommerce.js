@@ -111,6 +111,9 @@ let FFLConfigs = {
         width: 100%;
         margin-bottom: 15px;
         border-radius: 3px;
+      }
+      #checkout-payment-continue {
+        display: none;
       }`
 }
 
@@ -598,7 +601,9 @@ function handleAlertDeliveryInfo() {
     } else if (display === 'block') {
         const content = htmlTemplates.alertDeliveryInfo.replace('%message%', message)
         let shippingForm = document.querySelector('.checkout-step--shipping .checkout-form');
-        shippingForm.insertAdjacentHTML('beforebegin', content);
+        if (shippingForm) {
+            shippingForm.insertAdjacentHTML('beforebegin', content);
+        }
     }
 }
 
@@ -720,23 +725,28 @@ async function preventSubmissionOnShipping() {
 
 async function preventSubmissionOnPayment() {
     const observer = new MutationObserver(() => {
-        const element = document.querySelector("#checkout-payment-continue");
-        if (element && !element.dataset.preventSubmissionEvent) {
-            element.addEventListener('click', (event) => {
-                if (FFLConfigs.preventSubmition && !FFLConfigs.selectedDealer) {
-                    event.preventDefault();
-                    setTimeout(() => {
-                        document.getElementById("shipping-ffl").scrollIntoView();
-                    }, 1000);
-                    showMessage(FFLConfigs.preventSubmitionMessage);
-                }
-            });
-            element.dataset.preventSubmissionEvent = "true";
-        }
+        handleSubmissionOnPayment();
     });
 
     const targetNode = await waitForElement('.checkout-step--payment');
     observer.observe(targetNode, { childList: true, subtree: true, attributes: true });
+}
+
+function handleSubmissionOnPayment() {
+    const element = document.querySelector("#checkout-payment-continue");
+    if (element && !element.dataset.preventSubmissionEvent) {
+        element.style.display = 'block';
+        element.addEventListener('click', (event) => {
+            if (FFLConfigs.preventSubmition && !FFLConfigs.selectedDealer) {
+                event.preventDefault();
+                setTimeout(() => {
+                    document.getElementById("shipping-ffl").scrollIntoView();
+                }, 1000);
+                showMessage(FFLConfigs.preventSubmitionMessage);
+            }
+        });
+        element.dataset.preventSubmissionEvent = "true";
+    }
 }
 
 function backToCustomerCheckoutStep() {
@@ -840,6 +850,9 @@ function addFFLStyle() {
     await handleLoginOrLogout();
     preventGuestUserSubmissionOnLogin();
     preventSubmissionOnPayment();
+    setInterval(async () => {
+        handleSubmissionOnPayment();
+    }, 3000);
     addFFLStyle();
     await addFFLCheckoutStep();
     handleAmmoOnlyProducts();
