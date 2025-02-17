@@ -1,6 +1,7 @@
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
+    googleMapsKey: window.FFLGoogleMapsKey,
     storeHash: null,
     isGuestUser: true,
     preventSubmition: false,
@@ -74,6 +75,15 @@ let FFLConfigs = {
         max-width: 85%;
         max-height: 85%;
         overflow: visible;
+        @media (max-width: 551px) {
+          transform: none;
+          max-width: 100%;
+          min-height: initial;
+          bottom: 0;
+          max-height: 90%;
+          height: 90%;
+          top: initial;
+        }
       }
       #ffl-message-iframe-close {
         width: 22px;
@@ -81,12 +91,19 @@ let FFLConfigs = {
         right: 0;
         margin: -10px;
         cursor: pointer;
+        @media (max-width: 551px) {
+          margin: -13px 5px;
+        }
       }
       #ffl-message-iframe-modal .modal-content {
         width: 100%;
         height: 100%;
         overflow: hidden;
         border-radius: 6px;
+        @media (max-width: 551px) {
+          border-bottom-left-radius: 0;
+          border-bottom-right-radius: 0;
+        }
       }
       #alertDeliveryInfo {
         background-color: #feffd7;
@@ -472,7 +489,7 @@ async function addFFLCheckoutStep() {
 
     let fflTemplate = htmlTemplates.fflStep.replace('%items%', itemsHTML)
         .replace('%fflInfo%', htmlTemplates.fflInfo);
-    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}`);
+    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}&maps_api_key=${FFLConfigs.googleMapsKey}`);
     const wrapperElement = document.createElement('li');
     wrapperElement.classList.add('checkout-step', 'optimizedCheckout-checkoutStep', 'checkout-step--shipping-ffl', 'ffl-items');
     wrapperElement.style.display = 'none';

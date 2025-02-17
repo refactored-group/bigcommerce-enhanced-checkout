@@ -20,7 +20,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "npm run minify-js && react-scripts build",
+    "minify-js": "terser public/js/bigcommerce.js -o public/js/bigcommerce.min.js --compress --mangle",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "sass": "^1.81.0",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "terser": "^5.39.0"
   }
 }

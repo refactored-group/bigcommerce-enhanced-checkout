@@ -16,7 +16,7 @@ const Search: React.FC<SearchProps> = ({ location, miles, onChangeLocation, onHa
                 <input
                     value={ location }
                     onChange={ onChangeLocation }
-                    placeholder="zip code, city, or ffl"
+                    placeholder="zip code, city, or FFL"
                     onKeyPress={ onHandleKeypress }
                     className="px-4 py-2 border border-r-0 rounded-l-full transition duration-300 outline-0 focus:ring-0 group-hover:border-hover"
                 />

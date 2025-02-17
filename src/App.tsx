@@ -23,7 +23,7 @@ const App = () => {
     return <p>Unable to load the Automatic FFL Dealers. Please review your settings or contact support.</p>
   }
 
-  if (platform !== 'BigCommerce' && !googleMapsApiKey) {
+  if (!googleMapsApiKey) {
       return <p>The Google Maps API is missing. Please check your integration settings or ensure the API is properly configured.</p>
   }
 
