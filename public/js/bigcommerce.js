@@ -1,7 +1,6 @@
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
-    googleMapsKey: window.FFLGoogleMapsKey,
     storeHash: null,
     isGuestUser: true,
     preventSubmition: false,
@@ -492,7 +491,7 @@ async function addFFLCheckoutStep() {
 
     let fflTemplate = htmlTemplates.fflStep.replace('%items%', itemsHTML)
         .replace('%fflInfo%', htmlTemplates.fflInfo);
-    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}&maps_api_key=${FFLConfigs.googleMapsKey}`);
+    fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}`);
     const wrapperElement = document.createElement('li');
     wrapperElement.classList.add('checkout-step', 'optimizedCheckout-checkoutStep', 'checkout-step--shipping-ffl', 'ffl-items');
     wrapperElement.style.display = 'none';
@@ -833,7 +832,7 @@ function addFFLStyle() {
 
 (async () => {
     if (!FFLConfigs.storefrontApiToken || !FFLConfigs.checkoutId) {
-        console.error("FFL Shipment: Missing script params");
+        console.error("FFL Shipment: Missing script params.");
         return;
     }
     await initFFLProducts();
