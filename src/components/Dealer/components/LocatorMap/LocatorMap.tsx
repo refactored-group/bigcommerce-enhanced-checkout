@@ -25,7 +25,7 @@ const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, showMap, h
   const prevDealersRef = React.useRef<any[]>([]);
 
   return (
-    <APIProvider apiKey={apiKey}>
+    <APIProvider apiKey={apiKey ?? process.env.REACT_APP_GOOGLE_MAPS_KEY}>
       <Map
         defaultCenter={mapConfigs.defaultLatLng}
         defaultZoom={4}
