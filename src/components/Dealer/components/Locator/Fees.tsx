@@ -1,4 +1,6 @@
-export default function Fees(props: any): any {
+import { FeesProps } from './types';
+
+export default function Fees(props: FeesProps): JSX.Element | null {
   const { fees } = props;
 
   if (fees.length == 0) {

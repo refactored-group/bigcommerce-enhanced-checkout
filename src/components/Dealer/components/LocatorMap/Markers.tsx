@@ -1,10 +1,10 @@
 import React from 'react';
 import { useMap, InfoWindow, Marker } from '@vis.gl/react-google-maps';
-import { IMarkersProps } from './types';
+import { MarkersProps, DealerProps } from './types';
 import { handleSelect, onMarkerClick } from './utils';
 import { mapConfigs } from './constants';
 
-const createSvgMarker = (dealer: any) => {
+const createSvgMarker = (dealer: DealerProps) => {
   const isGoogleDefined = typeof google !== 'undefined';
   return {
     path: "m730.940002,1839.630005c-38.765991,-190.300049 -107.116028,-348.670044 -189.903015,-495.440063c-61.406982,-108.869995 -132.543976,-209.359985 -198.363983,-314.939941c-21.972015,-35.242981 -40.93399,-72.476013 -62.046997,-109.052979c-42.216003,-73.137024 -76.444,-157.934998 -74.269012,-267.932007c2.125,-107.473022 33.208008,-193.684021 78.029999,-264.172028c73.718994,-115.934998 197.201019,-210.988983 362.884003,-235.968994c135.466003,-20.423996 262.474976,14.082001 352.54303,66.748001c73.596008,43.03801 130.596008,100.526993 173.915955,168.280014c45.219971,70.716003 76.359985,154.259979 78.969971,263.231964c1.340088,55.830017 -7.799927,107.532043 -20.679932,150.41803c-13.030029,43.408997 -33.98999,79.695007 -52.640015,118.453979c-36.410034,75.658997 -82.050049,144.984009 -127.859985,214.343994c-136.437012,206.609985 -264.496033,417.310059 -320.580017,706.030029z",
@@ -17,10 +17,10 @@ const createSvgMarker = (dealer: any) => {
   };
 };
 
-const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setActiveDealer, showMap }: IMarkersProps) => {
+const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setActiveDealer, showMap }: MarkersProps) => {
   const map = useMap();
   
-  const fitMapToBounds = (map: google.maps.Map, dealers: any[], prevDealersRef: React.MutableRefObject<any[]>) => {
+  const fitMapToBounds = (map: google.maps.Map, dealers: DealerProps[], prevDealersRef: React.MutableRefObject<any[]>) => {
     const bounds = new google.maps.LatLngBounds();
     dealers.forEach(({ lat, lng }) => bounds.extend({ lat, lng }));
     map.fitBounds(bounds);
@@ -53,7 +53,7 @@ const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setAc
 
   return (
     <>
-      {dealers.map((dealer:any, index:any) => {
+      {dealers.map((dealer: DealerProps, index: number) => {
         const svgMarker = createSvgMarker(dealer);
         return (
           <Marker
