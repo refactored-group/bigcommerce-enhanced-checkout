@@ -937,16 +937,11 @@ function backToCustomerCheckoutStep() {
     }
 }
 
-function clickRedeemableLabel() {
-    const element = document.querySelector('a.redeemable-label[data-test="redeemable-label"]');
-    if (element) {
-        element.click();
-    } else {
-        console.warn("Elemento não encontrado.");
-    }
-}
 function backToShippingCheckoutStep() {
-
+    const shippingSelector = document.querySelector('.checkout-step--shipping .stepHeader-actions button');
+    if (shippingSelector) {
+        shippingSelector.click();
+    }
 }
 
 async function setAddressData() {
@@ -976,8 +971,9 @@ async function setAddressData() {
 }
 
 function shouldSetShippingConsignments() {
-    return true;
+    return FFLConfigs.isGuestUser && !FFLConfigs.hasNonFFLProducts
 }
+
 
 function showMessage(message) {
     const alertBox = document.querySelector('#ffl-message');
@@ -1047,12 +1043,4 @@ function addFFLStyle() {
     addAlertDeliveryInfo();
 
     window.addEventListener('message', handleDealerUpdate);
-
-    const event = new CustomEvent('consignmentsUpdated', {
-        detail: {
-            consignments: ''
-        }
-    });
-    document.dispatchEvent(event);
-
 })();
