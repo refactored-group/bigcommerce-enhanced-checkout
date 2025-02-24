@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React from 'react';
 import Header from './components/Header/Header';
-import LocatorMap from './components/LocatorMap/LocatorMap';
-import DealerCard from './components/Locator/DealerCard';
+import DealerList from './components/Locator/DealerList';
+import DealerMap from './components/Locator/DealerMap';
 import Search from './components/Search/Search';
 import './assets/styles.scss';
 // import dealers from './dealer.json'; //enable this line to use mock data
@@ -120,76 +120,29 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
             <Header handleCancel={ handleCancel } />
             <Search location={this.state.location} miles={this.state.miles} onChangeLocation={this.onChangeLocation} onHandleKeypress={this.onHandleKeypress} onChangeRadius={this.onChangeRadius} handleSearch={this.handleSearch}/>
           </div>
-          
-          <div ref={this.dealersRef} className="scrollbar flex-1 overflow-y-auto snap-y locator-modal-content mb-12 lg:mb-0">
-            {!this.state.loading && this.state.dealers.map((dealer: any, index: number) => (
-                <DealerCard
-                  key={ `${dealer}${index}` }
-                  dealer={ dealer }
-                  index={ index }
-                  handleActiveDealer={ this.handleActiveDealer }
-                  setActiveDealer={ this.state.activeDealer } />
-            ))}
-            {this.state.searched && !this.state.loading &&
-              (
-                <div className="text-center mb-4">
-                  <h4 className="text-sm text-gray-500">
-                    {
-                      this.state.dealers.length === 0 ?
-                      `No dealers found for "${this.state.currentLocation}"` :
-                      `${this.state.dealers.length} results found for "${this.state.currentLocation}"`
-                    }
-                  </h4>
-                </div>
-              )
-            }
-            {
-              this.state.loading &&
-              (
-                <div className="flex justify-center items-center">
-                  <img src="icons/loading.svg" alt="loading" className="w-10 h-10" />
-                </div>
-              )
-            }
-          </div>
+          <DealerList
+            dealersRef={this.dealersRef}
+            dealers={this.state.dealers}
+            loading={this.state.loading}
+            searched={this.state.searched}
+            currentLocation={this.state.currentLocation}
+            activeDealer={this.state.activeDealer}
+            handleActiveDealer={this.handleActiveDealer}
+          />
         </div>
-        <div id="dealersMap" className={`absolute lg:static w-full bottom-0 lg:flex-1 transition-all duration-200 locator-modal-map`}
-          style={{
-            height: this.state.showMap ? `${this.state.dealersHeight + 42}px` : "42px",
-          }}>
-            <div 
-              className="lg:hidden h-12 flex items-center justify-center font-bold bg-hover text-white cursor-pointer"
-              onClick={() => this.setState({ showMap: !this.state.showMap })}
-            >
-            { this.state.showMap ? 
-              <div className='flex'> {this.state.loading &&              
-                <div className="flex justify-center items-center mr-2">
-                  <img src="icons/loading-white.svg" alt="loading" className="w-5 h-5" />
-                </div>
-            } HIDE MAP</div> : 'VIEW MAP' }
-            </div>
-          <div className="w-full h-full locator-modal-map-wrapper">
-            <div className='hidden lg:block w-3 h-full absolute bg-gradient-to-r from-gray-300 to-transparent z-20'></div>
-            <LocatorMap
-              apiKey={ this.props.googleMapsApiKey }
-              dealers={ this.state.dealers }
-              selectDealer={ selectDealer }
-              setActiveDealer={ this.state.activeDealer }
-              handleActiveDealer={ this.handleActiveDealer }
-              showMap={ this.state.showMap } />
-          </div>
-          {
-            (this.props.announcement && this.state.showToast) &&
-            <div className="locator-toast-box">
-              <div className="locator-toast-close">
-                <a onClick={ this.hideToast } className="white-text" href="#">X</a>
-              </div>
-              <div className="locator-toast-text">
-               { this.props.announcement }
-              </div>
-            </div>
-          }
-        </div>
+        <DealerMap
+          googleMapsApiKey={this.props.googleMapsApiKey}
+          dealers={this.state.dealers}
+          selectDealer={selectDealer}
+          activeDealer={this.state.activeDealer}
+          handleActiveDealer={this.handleActiveDealer}
+          showMap={this.state.showMap}
+          setShowMap={(show) => this.setState({ showMap: show })}
+          dealersHeight={this.state.dealersHeight}
+          loading={this.state.loading}
+          announcement={this.props.announcement}
+          showToast={this.state.showToast}
+          hideToast={this.hideToast} />
       </div>
     );
   }

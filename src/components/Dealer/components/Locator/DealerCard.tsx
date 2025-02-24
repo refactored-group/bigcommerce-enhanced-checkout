@@ -2,8 +2,9 @@ import formatPhoneNumber from '../../PhoneNumberFormatter';
 import Fees from './Fees';
 import Schedules from './Schedules';
 import './assets/styles.scss';
+import { DealerCardProps } from './types';
 
-export default function DealerCard(props: any): any {
+export default function DealerCard(props: DealerCardProps): JSX.Element {
   const { dealer, index, handleActiveDealer, setActiveDealer } = props;
   let isActive = dealer === setActiveDealer;
 
