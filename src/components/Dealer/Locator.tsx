@@ -59,7 +59,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
 
     if (location && radius) {
       this.setState({loading: true, currentLocation: location});
-      fetch(`https://${process.env.REACT_APP_HOST}/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
+      fetch(`https://app-stage.automaticffl.com/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
         {
           method: "GET",
           headers: {
@@ -120,7 +120,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
             <Header handleCancel={ handleCancel } />
             <Search location={this.state.location} miles={this.state.miles} onChangeLocation={this.onChangeLocation} onHandleKeypress={this.onHandleKeypress} onChangeRadius={this.onChangeRadius} handleSearch={this.handleSearch}/>
           </div>
-          
+
           <div ref={this.dealersRef} className="scrollbar flex-1 overflow-y-auto snap-y locator-modal-content mb-12 lg:mb-0">
             {!this.state.loading && this.state.dealers.map((dealer: any, index: number) => (
                 <DealerCard
@@ -157,12 +157,12 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
           style={{
             height: this.state.showMap ? `${this.state.dealersHeight + 42}px` : "42px",
           }}>
-            <div 
+            <div
               className="lg:hidden h-12 flex items-center justify-center font-bold bg-hover text-white cursor-pointer"
               onClick={() => this.setState({ showMap: !this.state.showMap })}
             >
-            { this.state.showMap ? 
-              <div className='flex'> {this.state.loading &&              
+            { this.state.showMap ?
+              <div className='flex'> {this.state.loading &&
                 <div className="flex justify-center items-center mr-2">
                   <img src="icons/loading-white.svg" alt="loading" className="w-5 h-5" />
                 </div>
@@ -171,7 +171,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
           <div className="w-full h-full locator-modal-map-wrapper">
             <div className='hidden lg:block w-3 h-full absolute bg-gradient-to-r from-gray-300 to-transparent z-20'></div>
             <LocatorMap
-              apiKey={ this.props.googleMapsApiKey }
+              apiKey="AIzaSyCOk4pPoys3i373bRTQq9VrMC2UGWV574k"
               dealers={ this.state.dealers }
               selectDealer={ selectDealer }
               setActiveDealer={ this.state.activeDealer }
