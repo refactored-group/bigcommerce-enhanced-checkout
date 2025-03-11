@@ -639,7 +639,7 @@ async function initFFLProducts() {
             fullProductData = {...matchedProduct};
         }
 
-        if (fflTypeField && ['firearm', 'yes'].includes(fflTypeField.node.value.toLowerCase())) {
+        if ((fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') || (fflField && fflField.node.value.toLowerCase() === 'yes')) {
             filteredProducts.fireArm.push(fullProductData);
             return;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {
@@ -647,9 +647,9 @@ async function initFFLProducts() {
             return;
         } else {
             filteredProducts.others.push(fullProductData);
+            FFLConfigs.hasNonFFLProducts = true;
             return;
         }
-        FFLConfigs.hasNonFFLProducts = true;
     });
 }
 
