@@ -639,7 +639,7 @@ async function initFFLProducts() {
             fullProductData = {...matchedProduct};
         }
 
-        if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') {
+        if (fflTypeField && ['firearm', 'yes'].includes(fflTypeField.node.value.toLowerCase())) {
             filteredProducts.fireArm.push(fullProductData);
             return;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {

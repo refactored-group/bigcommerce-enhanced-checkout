@@ -59,7 +59,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
 
     if (location && radius) {
       this.setState({loading: true, currentLocation: location});
-      fetch(`https://app-stage.automaticffl.com/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
+      fetch(`https://${process.env.REACT_APP_HOST}/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
         {
           method: "GET",
           headers: {
@@ -171,7 +171,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
           <div className="w-full h-full locator-modal-map-wrapper">
             <div className='hidden lg:block w-3 h-full absolute bg-gradient-to-r from-gray-300 to-transparent z-20'></div>
             <LocatorMap
-              apiKey="AIzaSyCOk4pPoys3i373bRTQq9VrMC2UGWV574k"
+              apiKey={ this.props.googleMapsApiKey }
               dealers={ this.state.dealers }
               selectDealer={ selectDealer }
               setActiveDealer={ this.state.activeDealer }
