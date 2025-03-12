@@ -1,8 +1,11 @@
+import environment from './config.js';
+
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
-    storeHash: null,
-    isGuestUser: true,
+    storeHash: '',
+    coupon: 'FFL',
+    isGuestUser: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
     isEnhancedCheckoutEnabled: false,
@@ -15,9 +18,8 @@ let FFLConfigs = {
     selectedDealer: null,
     hasNonFFLProducts: false,
     platform: 'BigCommerce',
-    automaticFFLStoreInfoEndpointUrl: 'https://app-stage.automaticffl.com/store-front/api/stores/',
-    // automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
-    automaticFFLIframeUrl: 'http://localhost:3000',
+    automaticFFLStoreInfoEndpointUrl: environment.FFL_STORE_ENDPOINT,
+    automaticFFLIframeUrl: environment.FFL_IFRAME_URL,
     previousAddressState: null,
     shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
     shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
@@ -26,12 +28,19 @@ let FFLConfigs = {
           color: #000;
           border-radius: 3px;
       }
+     .checkout-form div:nth-child(3) .dropdownTrigger, .checkout-form div:nth-child(3) .alertBox--error {
+        display:none;
+      }
+      .delete-consignment, .reallocate-items-button, a[data-test="reallocate-items-button"] {
+        display: none;
+      }
       .consignment {
           display: flex;
           flex-direction: row;
           margin: .75rem 0 1.5rem;
           width: 100%;
       }
+
       .consignment-product-figure {
           padding: 0 1.5rem 0;
           width: 25%;
@@ -113,12 +122,14 @@ let FFLConfigs = {
       }
       #checkout-payment-continue {
         display: none;
-      }`
+      }
+      `
 }
 
 let filteredProducts = {
     fireArm: [],
-    ammo: []
+    ammo: [],
+    others: []
 };
 
 const htmlTemplates = {
@@ -269,24 +280,40 @@ const graphqlPayloads = {
       }
     `,
     shippingConsignmentsMutation: `
-      mutation addCheckoutShippingConsignments($addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!) {
-        checkout {
-          addCheckoutShippingConsignments(input: $addCheckoutShippingConsignmentsInput) {
-            checkout {
-              entityId
-              shippingConsignments {
-                entityId
-                availableShippingOptions {
-                  entityId
-                }
-                selectedShippingOption {
-                  entityId
-                }
-              }
+      mutation addCheckoutShippingConsignments(
+  $addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!
+) {
+  checkout {
+    addCheckoutShippingConsignments(input: $addCheckoutShippingConsignmentsInput) {
+      checkout {
+        entityId
+        shippingConsignments {
+          entityId
+          lineItemIds
+          address {
+            address1
+            city
+            stateOrProvinceCode
+            postalCode
+            phone
+            countryCode
+          }
+          availableShippingOptions {
+            entityId
+            description
+            cost {
+              value
+              currencyCode
             }
+          }
+          selectedShippingOption {
+            entityId
           }
         }
       }
+    }
+  }
+}
     `
 };
 
@@ -390,21 +417,31 @@ async function getShippingConsignments() {
 }
 
 async function setShippingConsignments(dealerData) {
-    const lineItems = [];
+    const fflLineItems = [];
+    const otherLineItems = []
 
     filteredProducts.fireArm.forEach(product => {
-        lineItems.push({
+        fflLineItems.push({
             lineItemEntityId: product.entityId,
-            quantity: product.quantity
+            quantity: product.quantity,
         });
     });
 
     filteredProducts.ammo.forEach(product => {
-        lineItems.push({
+        fflLineItems.push({
             lineItemEntityId: product.entityId,
-            quantity: product.quantity
+            quantity: product.quantity,
         });
     });
+
+    filteredProducts.others.forEach(product => {
+        otherLineItems.push(
+            {
+                lineItemEntityId: product.entityId,
+                quantity: product.quantity,
+            }
+        );
+    })
 
     const variables = {
         addCheckoutShippingConsignmentsInput: {
@@ -425,13 +462,152 @@ async function setShippingConsignments(dealerData) {
                             countryCode: dealerData.countryCode,
                             shouldSaveAddress: false
                         },
-                        lineItems: lineItems
+
+                        lineItems: fflLineItems
+                    },
+                    {
+                        address: {
+                            firstName: "",
+                            lastName: "",
+                            company: '',
+                            address1: '',
+                            city: ' ',
+                            stateOrProvince: '',
+                            stateOrProvinceCode: '',
+                            postalCode: '',
+                            phone: '',
+                            countryCode: '',
+                            shouldSaveAddress: false
+                        },
+
+                        lineItems: otherLineItems
                     }
                 ]
             }
         }
     };
     await fetchGraphQLData(graphqlPayloads.shippingConsignmentsMutation, variables);
+    toggleFflCoupon();
+    // Not ideal to use setTimeout here but this is not a sensitive information, since we already have this data
+    // on the FFL Selector.
+    setTimeout(() => {
+        updateAddressDisplay(dealerData);
+    }, 5000);
+}
+
+/**
+ * Updates how the dealer address is displayed on the consignment
+ * @param dealerData
+ */
+function updateAddressDisplay(dealerData) {
+    const targetElement = document.querySelector('.checkout-form div:nth-child(3) .dropdownTrigger');
+    if (targetElement) {
+        let addressElement = document.getElementById('ffl-dealer-consignment-address');
+
+        if (!addressElement) {
+            addressElement = document.createElement('div');
+            addressElement.id = 'ffl-dealer-consignment-address';
+            targetElement.parentNode.insertBefore(addressElement, targetElement);
+        }
+
+        addressElement.innerHTML = `<b>${dealerData.company}</b> — ${dealerData.address1}, ${dealerData.stateOrProvinceCode}, ${dealerData.postalCode}, ${dealerData.phone}`;
+    }
+}
+
+/**
+ * This function will verify if there is a coupon already in the cart. If a coupon is found, remove it than add it again;
+ * If there is no coupon, insert the FFL.coupon to the cart, and then remove it.
+ * This is a shenanigan to trigger an update on the checkout page, without reloading the page.
+ */
+function toggleFflCoupon() {
+    const removeLink = document.querySelector('a[data-test="cart-price-callback"]');
+
+    if (removeLink) {
+        const couponContent = document.querySelector('.cart-priceItem-postFix[data-test="cart-price-code"]').textContent;
+        removeLink.click();
+        addCouponCode(couponContent);
+    } else {
+        monitorRemoveCoupon();
+        addCouponCode();
+    }
+}
+
+/**
+ * Monitor the "remove" coupon link. If it shows up, click on it.
+ */
+function monitorRemoveCoupon() {
+    const inputField = document.querySelector('input[name="redeemableCode"]');
+    const targetNode = document.querySelector('aside.layout-cart');
+    const observer = new MutationObserver((mutations, observerInstance) => {
+        const removeLink = document.querySelector('a[data-test="cart-price-callback"]');
+        if (removeLink) {
+            removeLink.click();
+            observerInstance.disconnect();
+            if (inputField) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                nativeInputValueSetter.call(inputField, ' ');
+                const inputEvent = new Event("input", { bubbles: true });
+                inputField.dispatchEvent(inputEvent);
+            }
+        }
+    });
+
+    observer.observe(targetNode, { childList: true, subtree: true });
+}
+
+/**
+ * Monitors the dom, looking for the "Ship to multiple addresses" button. We always want to go to the multishipping
+ * checkout if we have FFL products in the cart. The user should not be allowed to go to the single checkout.
+ */
+function monitorShippingToggleButton() {
+    const observer = new MutationObserver((mutations, obs) => {
+        const link = document.querySelector('a[data-test="shipping-mode-toggle"]');
+
+        if (link) {
+            if (link.textContent.trim() === "Ship to multiple addresses") {
+                link.click();
+            }
+            const style = document.createElement("style");
+            style.innerHTML = 'a[data-test="shipping-mode-toggle"] { display: none !important; }';
+            document.head.appendChild(style);
+            obs.disconnect();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+/**
+ * Adds a coupon code to the cart using the form on the checkout page
+ */
+function addCouponCode() {
+    const label = document.querySelector('a.redeemable-label');
+    const inputField = document.querySelector('input[name="redeemableCode"]');
+
+    if (!inputField) {
+        label.click();
+    }
+
+    setTimeout(() => {
+        const inputField = document.querySelector('input[name="redeemableCode"]');
+        const applyButton = document.getElementById("applyRedeemableButton");
+
+        if (inputField && applyButton) {
+            // I had to use the native setter because of React
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+            nativeInputValueSetter.call(inputField, FFLConfigs.coupon);
+
+            // Notifying React about the changes
+            const inputEvent = new Event("input", { bubbles: true });
+            inputField.dispatchEvent(inputEvent);
+
+            setTimeout(() => {
+                applyButton.click();
+            }, 100);
+            setTimeout(() => {
+            }, 500);
+        }
+    }, 200);
 }
 
 async function initFFLProducts() {
@@ -453,21 +629,28 @@ async function initFFLProducts() {
         const fflField = productDetail.customFields.edges.find(field => field.node.name.toLowerCase() === 'ffl');
         let fullProductData = null;
 
+        const matchedProduct = products.find(prod => prod.productEntityId === productDetail.entityId);
+
         if (fflTypeField || fflField) {
             const matchedProduct = products.find(prod => prod.productEntityId === productDetail.entityId);
             fullProductData = {...matchedProduct, ffl_type: fflTypeField ? fflTypeField.node.value.toLowerCase() : 'firearm'};
         }
-        if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') {
+        else
+        {
+            fullProductData = {...matchedProduct};
+        }
+
+        if ((fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') || (fflField && fflField.node.value.toLowerCase() === 'yes')) {
             filteredProducts.fireArm.push(fullProductData);
             return;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {
             filteredProducts.ammo.push(fullProductData);
             return;
-        } else if (fflField && fflField.node.value.toLowerCase() === 'yes') {
-            filteredProducts.fireArm.push(fullProductData);
+        } else {
+            filteredProducts.others.push(fullProductData);
+            FFLConfigs.hasNonFFLProducts = true;
             return;
         }
-        FFLConfigs.hasNonFFLProducts = true;
     });
 }
 
@@ -792,6 +975,7 @@ function shouldSetShippingConsignments() {
     return FFLConfigs.isGuestUser && !FFLConfigs.hasNonFFLProducts
 }
 
+
 function showMessage(message) {
     const alertBox = document.querySelector('#ffl-message');
     const alertBoxMessage = document.querySelector('#ffl-message-alert-modal');
@@ -854,9 +1038,10 @@ function addFFLStyle() {
     }, 3000);
     addFFLStyle();
     await addFFLCheckoutStep();
+    monitorShippingToggleButton();
     handleAmmoOnlyProducts();
     preventSubmissionOnShipping();
     addAlertDeliveryInfo();
-    
+
     window.addEventListener('message', handleDealerUpdate);
 })();
