@@ -20,7 +20,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "npm run minify-js && react-scripts build",
+    "build": "npm run generate-config && npm run minify-js && react-scripts build",
+    "generate-config": "sed \"s|FFL_STORE_ENDPOINT: ''|FFL_STORE_ENDPOINT: '${FFL_STORE_ENDPOINT}'|g; s|FFL_IFRAME_URL: ''|FFL_IFRAME_URL: '${FFL_IFRAME_URL}'|g\" config.template.js > public/js/config.js",
     "minify-js": "terser public/js/bigcommerce.js -o public/js/bigcommerce.min.js --compress --mangle",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
