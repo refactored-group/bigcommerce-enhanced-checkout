@@ -2,7 +2,18 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Environment variables
+
+You'll need to set your environment variables before using this project.
+
+`FFL_STORE_ENDPOINT` = FFL backend endpoint to get the store config
+`FFL_IFRAME_URL` = React iframe URL
+
 ## Available Scripts
+
+Generate the config.js, which contains the environment variables used in bigcommerce.js. Remember to set the environment variables first.
+
+### `npm run generate-config`
 
 In the project directory, you can run:
 
