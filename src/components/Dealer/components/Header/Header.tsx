@@ -13,8 +13,8 @@ const Header: React.FC<HeaderProps> = ({ handleCancel }) => {
               </button>}
               <img src="./logo-automaticffl.png" alt="Automatic FFL" className="w-32 mx-auto" />
             </div>
-            <div className="text-center">
-              <p className="font-bold text-primary">FIND YOUR DEALER</p>
+            <div className="text-center px-4">
+              <p className="font-bold text-primary text-2xl">FIND YOUR DEALER</p>
               <span>Use the options below to search for a dealer near you.</span>
             </div>
         </>

@@ -3,8 +3,9 @@ import { APIProvider, Map } from '@vis.gl/react-google-maps';
 import Markers from './Markers'
 import { mapConfigs } from './constants';
 import { IProps } from './types';
+import { useEffect } from 'react';
 
-const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer }: IProps) => {
+const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, showMap, handleActiveDealer }: IProps) => {
   const [state, setState] = useState({
     activeMarker: null,
     activeDealer: null,
@@ -14,6 +15,12 @@ const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer }: IProps) 
     center: mapConfigs.defaultLatLng,
     zoom: null,
   });
+
+  useEffect(() => {
+    if (state.activeDealer) {
+      handleActiveDealer(state.activeDealer);
+    }
+  }, [state.activeDealer]);
 
   const prevDealersRef = React.useRef<any[]>([]);
 
@@ -34,6 +41,7 @@ const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer }: IProps) 
           setState={setState}
           selectDealer={selectDealer}
           setActiveDealer={setActiveDealer}
+          showMap={showMap}
         />
       </Map>
     </APIProvider>

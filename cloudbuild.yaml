@@ -2,6 +2,9 @@ steps:
 - name: 'node:20'
   script: npm ci && npm run build
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  env:
+    - 'FFL_STORE_ENDPOINT=${_FFL_STORE_ENDPOINT}'
+    - 'FFL_IFRAME_URL=${_FFL_IFRAME_URL}'
   args:
   - 'gsutil'
   - '-m'
