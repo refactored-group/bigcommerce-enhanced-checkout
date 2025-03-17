@@ -12,3 +12,9 @@ steps:
       - '-r'
       - 'build/'
       - '${_WWW_BUCKET}/'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud compute url-maps invalidate-cdn-cache ${_URL_MAP} --path "/big-commerce-enhanced-checkout/*"
