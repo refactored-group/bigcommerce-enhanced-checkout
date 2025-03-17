@@ -1,5 +1,3 @@
-import environment from './config.js';
-
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
@@ -18,8 +16,8 @@ let FFLConfigs = {
     selectedDealer: null,
     hasNonFFLProducts: false,
     platform: 'BigCommerce',
-    automaticFFLStoreInfoEndpointUrl: environment.FFL_STORE_ENDPOINT,
-    automaticFFLIframeUrl: environment.FFL_IFRAME_URL,
+    automaticFFLStoreInfoEndpointUrl: window.FFL_ENVIRONMENT.FFL_STORE_ENDPOINT,
+    automaticFFLIframeUrl: window.FFL_ENVIRONMENT.FFL_IFRAME_URL,
     previousAddressState: null,
     shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
     shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
