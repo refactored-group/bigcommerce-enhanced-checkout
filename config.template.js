@@ -8,7 +8,7 @@
  *
  * @type {{FFL_IFRAME_URL: string, FFL_STORE_ENDPOINT: string}}
  */
-module.exports = {
+window.FFL_ENVIRONMENT = {
     FFL_STORE_ENDPOINT: '',
     FFL_IFRAME_URL: '',
 };
