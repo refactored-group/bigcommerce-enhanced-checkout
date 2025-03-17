@@ -14,7 +14,7 @@ steps:
       - '${_WWW_BUCKET}/'
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
-      - 'glcoud'
+      - 'gcloud'
       - 'compute'
       - 'url-maps'
       - 'invalidate-cdn-cache'
