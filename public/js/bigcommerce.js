@@ -1,4 +1,3 @@
-// Test
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
