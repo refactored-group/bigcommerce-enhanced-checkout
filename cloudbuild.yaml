@@ -4,7 +4,7 @@ steps:
       - 'FFL_STORE_ENDPOINT=${_FFL_STORE_ENDPOINT}'
       - 'FFL_IFRAME_URL=${_FFL_IFRAME_URL}'
       - 'REACT_APP_HOST=${_REACT_APP_HOST}'
-      - 'REACT_APP_GOOGLE_MAPS_KEY=${REACT_APP_GOOGLE_MAPS_KEY}'
+      - 'REACT_APP_GOOGLE_MAPS_KEY=${_REACT_APP_GOOGLE_MAPS_KEY}'
     script: npm ci && npm run build
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
