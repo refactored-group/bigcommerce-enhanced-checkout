@@ -55,8 +55,11 @@ let FFLConfigs = {
          background-color: black;
       }
       #ffl-message-alert-modal {
+        width: 100%;
+        margin-top: 20%;
          @media (min-width: 600px) {
-             width: 470px;
+            width: 470px;
+            margin-top: initial;
          }
          display: none;
          visibility: visible;
@@ -70,6 +73,12 @@ let FFLConfigs = {
         width: 76px;
         height: 76px;
         margin: 1.25em auto 1.875em;
+      }
+      #ffl-message-alert-modal h4 {
+        margin-bottom: 10px;
+      }
+      #ffl-message-alert-modal #ffl-alert-state-info {
+        margin-top: 8px; border-radius: 6px;
       }
       #ffl-message-iframe-modal {
         display: none;
@@ -89,6 +98,11 @@ let FFLConfigs = {
           height: 90%;
           top: initial;
         }
+      }
+      #ffl-message-iframe-modal iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
       }
       #ffl-message-iframe-close {
         width: 22px;
@@ -113,6 +127,14 @@ let FFLConfigs = {
       #checkout-payment-continue {
         display: none;
       }
+      #ffl-alert-state-info {
+        display: none;
+        background-color: #feffd7;
+        padding: 13px 20px;
+        width: 100%;
+        margin-bottom: 15px;
+        border-radius: 3px;
+      }
       `
 }
 
@@ -136,7 +158,7 @@ const htmlTemplates = {
             </div>
           </div>
           <div aria-busy="false" class="checkout-view-content checkout-view-content-enter-done">
-            <section class="ffl-section checkout-form" style="">
+            <section class="ffl-section checkout-form">
                 <div>
                   <div id="ffl-alert" class="alertBox alertBox--error alertBox--font-color-black">
                       %items%
@@ -162,16 +184,25 @@ const htmlTemplates = {
         <div id="ffl-message-alert-modal" class="modal modal--alert modal--small" tabindex="0">
             <div class="modal-alert-icon"><img src="${FFLConfigs.automaticFFLIframeUrl}/bigcommerce-alert-icon.svg" alt=""/></div>
             <div class="modal-content"></div>
-            <div class="button-container">
-                <button type="button" class="confirm button" onclick="hideMessage()">OK</button>
-            </div>
+            <div class="button-container"></div>
             <div class="loadingOverlay" style="display: none;"></div>
         </div>`,
+    fflMessageDefaultButton: `<button type="button" class="confirm button" onclick="hideMessage()">OK</button>`,
+    fflMessageState: `<h4>Ammunition shipments must go<br/>through an FFL dealer in some states.</h4>
+            <form id="ffl-message-state-form">
+            <div class="form-field">
+                <label for="ffl-province-code-input" id="ffl-province-code-input-label" class="form-label optimizedCheckout-form-label">Please select your shipping state:</label>
+                <div class="dropdown-chevron"><div class="icon"><svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"></path></svg></div></div><select required class="form-select optimizedCheckout-form-select" id="ffl-province-code-input" onchange="handleStateSelected()"><option value="">Select a state</option><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AS">American Samoa</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="AA">Armed Forces Americas</option><option value="AE">Armed Forces Europe</option><option value="AP">Armed Forces Pacific</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option><option value="FM">Federated States Of Micronesia</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="GU">Guam</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MH">Marshall Islands</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="MP">Northern Mariana Islands</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PW">Palau</option><option value="PA">Pennsylvania</option><option value="PR">Puerto Rico</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VI">Virgin Islands</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select>
+            </div>
+            </form>
+            <div id="ffl-alert-state-info"></div>
+        </div>`,
+    fflMessageStateButton: `<button type="button" class="confirm button button--primary optimizedCheckout-buttonPrimary" onclick="handleCloseStateModal()">CONFIRM</button>`,
     fflModal: `<div id="ffl-message-iframe" class="modal-background"></div>
         <div id="ffl-message-iframe-modal" class="modal modal--alert modal--small" tabindex="0">
             <div id="ffl-message-iframe-close" onclick="hideFFLDealerModal()"><img src="${FFLConfigs.automaticFFLIframeUrl}/bigcommerce-close-icon.svg" alt=""/></div>
             <div class="modal-content">
-                <iframe src="%url%" style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe src="%url%"></iframe>
             </div>
             <div class="loadingOverlay" style="display: none;"></div>
         </div>`
@@ -795,10 +826,54 @@ async function addFFLCheckoutStep() {
 }
 
 /**
- * TODO: Get the delivery state from a modal on page load
+ * Show delivery state modal if there is ammo in the cart
+ * @returns void
  */
 async function handleStateModal() {
+    if (filteredProducts.ammo.length === 0) {
+        return;
+    }
+    showMessage(htmlTemplates.fflMessageState, htmlTemplates.fflMessageStateButton);
+}
 
+/**
+ * On state change, check if the ammo requires or not to be shipped to a Dealer
+ * @returns void
+ */
+async function handleStateSelected() {
+    const selectedState = document.getElementById('ffl-province-code-input').value;
+    const alertStateInfo = document.getElementById('ffl-alert-state-info');
+
+    if (!selectedState) {
+        alertStateInfo.style.display = 'none';
+        return;
+    }
+
+    if (FFLConfigs.statesRequireAmmoFFL.includes(selectedState)) {
+        alertStateInfo.innerHTML = `The chosen state <strong>requires</strong> an FFL for ammunition.`;
+        FFLConfigs.ammoRequireFFL = true;
+    } else {
+        alertStateInfo.innerHTML = `The chosen state <strong>doesn't require</strong> an FFL for ammunition.`;
+        FFLConfigs.ammoRequireFFL = false;
+    }
+    alertStateInfo.style.display = 'block';
+}
+
+/**
+ * Validate the state modal form and shows the ammo if required
+ * @returns void
+ */
+async function handleCloseStateModal() {
+    const fflProvinceCodeInput = document.getElementById('ffl-message-state-form');
+    fflProvinceCodeInput.checkValidity();
+    if (!fflProvinceCodeInput.checkValidity()) {
+        fflProvinceCodeInput.reportValidity()
+        return;
+    }
+    if (FFLConfigs.ammoRequireFFL) {
+        setFFLVisibility('ammo');
+    }
+    hideMessage();
 }
 
 /**
@@ -990,14 +1065,21 @@ function backToShippingCheckoutStep() {
     }
 }
 
-function showMessage(message) {
+function showMessage(message, customButton = false) {
     const alertBox = document.querySelector('#ffl-message');
     const alertBoxMessage = document.querySelector('#ffl-message-alert-modal');
     const alertBoxMessageContent = document.querySelector('#ffl-message-alert-modal .modal-content');
+    const buttonContainer = document.querySelector('#ffl-message-alert-modal .button-container');
+
     Object.assign(alertBox.style, {display: 'block', opacity: '0.8'});
     Object.assign(alertBoxMessage.style, {display: 'block', opacity: '1'});
 
-    alertBoxMessageContent.innerText = message;
+    alertBoxMessageContent.innerHTML = message;
+    if (customButton) {
+        buttonContainer.innerHTML = customButton;
+    } else {
+        buttonContainer.innerHTML = htmlTemplates.fflMessageDefaultButton;
+    }
 }
 
 function hideMessage() {
