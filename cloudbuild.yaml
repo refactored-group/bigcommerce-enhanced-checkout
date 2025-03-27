@@ -1,11 +1,26 @@
 steps:
-- name: 'node:20'
-  script: npm ci && npm run build
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  args:
-  - 'gsutil'
-  - '-m'
-  - 'rsync'
-  - '-r'
-  - 'build/'
-  - '${_WWW_BUCKET}/'
+  - name: 'node:20'
+    env:
+      - 'FFL_STORE_ENDPOINT=${_FFL_STORE_ENDPOINT}'
+      - 'FFL_IFRAME_URL=${_FFL_IFRAME_URL}'
+      - 'REACT_APP_HOST=${_REACT_APP_HOST}'
+      - 'REACT_APP_GOOGLE_MAPS_KEY=${_REACT_APP_GOOGLE_MAPS_KEY}'
+    script: npm ci && npm run build
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'gsutil'
+      - '-m'
+      - 'rsync'
+      - '-r'
+      - 'build/'
+      - '${_WWW_BUCKET}/'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'gcloud'
+      - 'compute'
+      - 'url-maps'
+      - 'invalidate-cdn-cache'
+      - '${_URL_MAP}'
+      - '--path'
+      - '/big-commerce-enhanced-checkout/*'
+      - '--async'

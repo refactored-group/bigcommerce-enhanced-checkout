@@ -1,8 +1,11 @@
 let FFLConfigs = {
     storefrontApiToken: window.FFLStorefrontApiToken,
     checkoutId: window.FFLCheckoutId,
-    storeHash: null,
-    isGuestUser: true,
+    storeHash: '',
+    coupon: 'FFL',
+    isGuestUser: false,
+    customerData: null,
+    isFflLoaded: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
     isEnhancedCheckoutEnabled: false,
@@ -14,10 +17,11 @@ let FFLConfigs = {
     ammoRequireFFLMessage: 'Your ammunition products will be shipped to this FFL holder due to the requirements of the selected state.',
     selectedDealer: null,
     hasNonFFLProducts: false,
+    hasFFLProducts: false,
+    isMixedCart: false,
     platform: 'BigCommerce',
-    automaticFFLStoreInfoEndpointUrl: 'https://app-stage.automaticffl.com/store-front/api/stores/',
-    // automaticFFLIframeUrl: 'https://automaticffl.pages.dev',
-    automaticFFLIframeUrl: 'http://localhost:3000',
+    automaticFFLStoreInfoEndpointUrl: window.FFL_ENVIRONMENT.FFL_STORE_ENDPOINT,
+    automaticFFLIframeUrl: window.FFL_ENVIRONMENT.FFL_IFRAME_URL,
     previousAddressState: null,
     shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
     shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
@@ -26,12 +30,19 @@ let FFLConfigs = {
           color: #000;
           border-radius: 3px;
       }
+     .checkout-form div:nth-child(3) .dropdownTrigger, .checkout-form div:nth-child(3) .alertBox--error {
+        display: none;
+      }
+      .delete-consignment, .reallocate-items-button, a[data-test="reallocate-items-button"] {
+        display: none;
+      }
       .consignment {
           display: flex;
           flex-direction: row;
           margin: .75rem 0 1.5rem;
           width: 100%;
       }
+
       .consignment-product-figure {
           padding: 0 1.5rem 0;
           width: 25%;
@@ -113,12 +124,14 @@ let FFLConfigs = {
       }
       #checkout-payment-continue {
         display: none;
-      }`
+      }
+      `
 }
 
 let filteredProducts = {
     fireArm: [],
-    ammo: []
+    ammo: [],
+    others: []
 };
 
 const htmlTemplates = {
@@ -182,6 +195,8 @@ const graphqlPayloads = {
       query {
         customer {
           entityId
+          firstName
+          lastName
         }
       }
     `,
@@ -269,24 +284,40 @@ const graphqlPayloads = {
       }
     `,
     shippingConsignmentsMutation: `
-      mutation addCheckoutShippingConsignments($addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!) {
-        checkout {
-          addCheckoutShippingConsignments(input: $addCheckoutShippingConsignmentsInput) {
-            checkout {
-              entityId
-              shippingConsignments {
-                entityId
-                availableShippingOptions {
-                  entityId
-                }
-                selectedShippingOption {
-                  entityId
-                }
-              }
+      mutation addCheckoutShippingConsignments(
+  $addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!
+) {
+  checkout {
+    addCheckoutShippingConsignments(input: $addCheckoutShippingConsignmentsInput) {
+      checkout {
+        entityId
+        shippingConsignments {
+          entityId
+          lineItemIds
+          address {
+            address1
+            city
+            stateOrProvinceCode
+            postalCode
+            phone
+            countryCode
+          }
+          availableShippingOptions {
+            entityId
+            description
+            cost {
+              value
+              currencyCode
             }
+          }
+          selectedShippingOption {
+            entityId
           }
         }
       }
+    }
+  }
+}
     `
 };
 
@@ -341,16 +372,67 @@ async function initFFLConfigs() {
     }
 }
 
+/**
+ * This function is triggered at {@link handleLoginOrLogout} by a Mutation Observer.
+ * When firearm products are included in the `filteredProducts`, it will fetch the user information
+ * and update the FFLConfigs.isGuestUser to true.
+ *
+ * If a dealer is not selected yet, it will trig {@link backToCustomerCheckoutStep}
+ *
+ * @returns {Promise<void>}
+ */
 async function checkIfGuestUser() {
     if (filteredProducts.fireArm.length === 0) {
         return;
     }
     const data = await fetchGraphQLData(graphqlPayloads.userInformationQuery);
+
+    // User logs in
+    if (FFLConfigs.isFflLoaded === false && data.customer?.entityId) {
+        FFLConfigs.customerData = data.customer;
+        if (FFLConfigs.hasFFLProducts) {
+            addFFLCheckoutStep();
+            hideAllAfterCustomer();
+        }
+    } else if (FFLConfigs.isFflLoaded === true && FFLConfigs.isGuestUser === false) {
+        // Reload consignments and toggle coupon if the user logs out and in again
+        await setShippingConsignments(FFLConfigs.selectedDealer);
+        FFLConfigs.customerData = data.customer;
+    }
+
     FFLConfigs.isGuestUser = !data.customer?.entityId;
 
     if (!FFLConfigs.selectedDealer) {
         backToCustomerCheckoutStep();
     }
+}
+
+/**
+ * Hides all checkout steps after Customer
+ */
+function hideAllAfterCustomer()
+{
+    const shippingSection =  document.querySelector('.checkout-step--shipping');
+    const billingSection =  document.querySelector('.checkout-step--billing');
+    const paymentSection =  document.querySelector('.checkout-step--payment');
+
+    shippingSection.style.display = 'none';
+    billingSection.style.display = 'none';
+    paymentSection.style.display = 'none';
+}
+
+/**
+ * Displays all checkout steps after Customer
+ */
+function displayAllAfterCustomer()
+{
+    const shippingSection =  document.querySelector('.checkout-step--shipping');
+    const billingSection =  document.querySelector('.checkout-step--billing');
+    const paymentSection =  document.querySelector('.checkout-step--payment');
+
+    shippingSection.style.display = 'block';
+    billingSection.style.display = 'block';
+    paymentSection.style.display = 'block';
 }
 
 async function getStoreHash() {
@@ -384,56 +466,263 @@ async function getProductDetailsByIds(productIds) {
     return data.site.products.edges.map(edge => edge.node);
 }
 
+/**
+ * Retrieves shipping consignments for the current cart
+ * @returns {Promise<*|null>}
+ */
 async function getShippingConsignments() {
     const data = await fetchGraphQLData(graphqlPayloads.shippingConsignmentsQuery);
     return data?.site.checkout.shippingConsignments[0]?.address || null;
 }
 
+/**
+ * Creates separate consignments for regular and FFL products.
+ * The first consignment will have the dealer address data, while the second consignment has invalid data.
+ * DO NOT remove the empty space in the `city` field. If all fields are empty, BigCommerce will just ignore
+ * the consignment.
+ *
+ * @param dealerData
+ * @returns {Promise<void>}
+ */
 async function setShippingConsignments(dealerData) {
-    const lineItems = [];
+    const fflLineItems = [];
+    const otherLineItems = []
 
     filteredProducts.fireArm.forEach(product => {
-        lineItems.push({
+        fflLineItems.push({
             lineItemEntityId: product.entityId,
-            quantity: product.quantity
+            quantity: product.quantity,
         });
     });
 
     filteredProducts.ammo.forEach(product => {
-        lineItems.push({
+        fflLineItems.push({
             lineItemEntityId: product.entityId,
-            quantity: product.quantity
+            quantity: product.quantity,
         });
     });
+
+    filteredProducts.others.forEach(product => {
+        otherLineItems.push(
+            {
+                lineItemEntityId: product.entityId,
+                quantity: product.quantity,
+            }
+        );
+    })
+
+    // Mixed carts need 2 consignments. Orders with FFL items only need just one.
+    let customConsignments;
+
+    if (FFLConfigs.isMixedCart) {
+        customConsignments = [
+            {
+                address: {
+                    firstName: FFLConfigs.customerData.firstName, // mandatory first and last name
+                    lastName: FFLConfigs.customerData.lastName,
+                    company: dealerData.company,
+                    address1: dealerData.address1,
+                    city: dealerData.city,
+                    stateOrProvince: dealerData.stateOrProvinceCode,
+                    stateOrProvinceCode: dealerData.stateOrProvinceCode,
+                    postalCode: dealerData.postalCode,
+                    phone: dealerData.phone,
+                    countryCode: dealerData.countryCode,
+                    shouldSaveAddress: false
+                },
+
+                lineItems: fflLineItems
+            },
+            {
+                address: {
+                    firstName: "",
+                    lastName: "",
+                    company: '',
+                    address1: '',
+                    city: ' ', // Do not remove this empty space
+                    stateOrProvince: '',
+                    stateOrProvinceCode: '',
+                    postalCode: '',
+                    phone: '',
+                    countryCode: '',
+                    shouldSaveAddress: false
+                },
+
+                lineItems: otherLineItems
+            }
+        ]
+    } else {
+        customConsignments = [
+            {
+                address: {
+                    firstName: FFLConfigs.customerData.firstName, // mandatory first and last name
+                    lastName: FFLConfigs.customerData.lastName,
+                    company: dealerData.company,
+                    address1: dealerData.address1,
+                    city: dealerData.city,
+                    stateOrProvince: dealerData.stateOrProvinceCode,
+                    stateOrProvinceCode: dealerData.stateOrProvinceCode,
+                    postalCode: dealerData.postalCode,
+                    phone: dealerData.phone,
+                    countryCode: dealerData.countryCode,
+                    shouldSaveAddress: false
+                },
+
+                lineItems: fflLineItems
+            }
+        ]
+    }
 
     const variables = {
         addCheckoutShippingConsignmentsInput: {
             checkoutEntityId: FFLConfigs.checkoutId,
             data: {
-                consignments: [
-                    {
-                        address: {
-                            firstName: "",
-                            lastName: "",
-                            company: dealerData.company,
-                            address1: dealerData.address1,
-                            city: dealerData.city,
-                            stateOrProvince: dealerData.stateOrProvinceCode,
-                            stateOrProvinceCode: dealerData.stateOrProvinceCode,
-                            postalCode: dealerData.postalCode,
-                            phone: dealerData.phone,
-                            countryCode: dealerData.countryCode,
-                            shouldSaveAddress: false
-                        },
-                        lineItems: lineItems
-                    }
-                ]
+                consignments: customConsignments
             }
         }
     };
     await fetchGraphQLData(graphqlPayloads.shippingConsignmentsMutation, variables);
+
+    /**
+     * Adds and removes a coupon from the cart to force the DOM update
+     */
+    toggleFflCoupon();
+    // Not ideal to use setTimeout here but this is not sensitive information, since we already have this data
+    // on the FFL Selector.
+    setTimeout(() => {
+        updateAddressDisplay(dealerData);
+    }, 5000);
 }
 
+/**
+ * Updates how the dealer address is displayed on the consignment
+ * @param dealerData
+ */
+function updateAddressDisplay(dealerData) {
+    const targetElement = document.querySelector('.checkout-form div:nth-child(3) .dropdownTrigger');
+    if (targetElement) {
+        let addressElement = document.getElementById('ffl-dealer-consignment-address');
+
+        if (!addressElement) {
+            addressElement = document.createElement('div');
+            addressElement.id = 'ffl-dealer-consignment-address';
+            targetElement.parentNode.insertBefore(addressElement, targetElement);
+        }
+
+        addressElement.innerHTML = `<b>${dealerData.company}</b> — ${dealerData.address1}, ${dealerData.stateOrProvinceCode}, ${dealerData.postalCode}, ${dealerData.phone}`;
+    }
+}
+
+/**
+ * Forces the DOM to be reloaded by adding and removing a coupon from the cart.
+ */
+function toggleFflCoupon() {
+    const removeLink = document.querySelector('a[data-test="cart-price-callback"]');
+
+    // If the removeLInk is being displayed, we already have a coupon in the cart...
+    if (removeLink) {
+        //... remove it and add it back
+        const couponContent = document.querySelector('.cart-priceItem-postFix[data-test="cart-price-code"]').textContent;
+        removeLink.click();
+        addCouponCode(couponContent);
+    } else {
+        // Monitors the remove coupon button
+        monitorRemoveCoupon();
+
+        // Add custom FFLConfigs.coupon coupon to the cart, then remove it when the remove link is displayed (monitorRemoveCoupon()).
+        addCouponCode();
+    }
+}
+
+/**
+ * Monitor the "remove" coupon link. If it shows up, click on it.
+ */
+function monitorRemoveCoupon() {
+    const inputField = document.querySelector('input[name="redeemableCode"]');
+    const targetNode = document.querySelector('aside.layout-cart');
+    const observer = new MutationObserver((mutations, observerInstance) => {
+        const removeLink = document.querySelector('a[data-test="cart-price-callback"]');
+        if (removeLink) {
+            removeLink.click();
+            const inputField = document.querySelector('input[name="redeemableCode"]');
+
+            // Set color back to the original
+            inputField.style.color = '';
+
+            observerInstance.disconnect();
+            if (inputField) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                nativeInputValueSetter.call(inputField, ' ');
+                const inputEvent = new Event("input", { bubbles: true });
+                inputField.dispatchEvent(inputEvent);
+            }
+        }
+    });
+
+    observer.observe(targetNode, { childList: true, subtree: true });
+}
+
+/**
+ * Monitors the dom, looking for the "Ship to multiple addresses" button. We always want to go to the multishipping
+ * checkout if we have FFL products in the cart. The user should not be allowed to go to the single checkout.
+ */
+function monitorShippingToggleButton() {
+    const observer = new MutationObserver((mutations, obs) => {
+        const link = document.querySelector('a[data-test="shipping-mode-toggle"]');
+
+        if (FFLConfigs.isFflLoaded && link) {
+            if (link.textContent.trim() === "Ship to multiple addresses") {
+                link.click();
+            }
+            const style = document.createElement("style");
+            style.innerHTML = 'a[data-test="shipping-mode-toggle"] { display: none !important; }';
+            document.head.appendChild(style);
+            obs.disconnect();
+        }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+/**
+ * Adds a coupon code to the cart using the form on the checkout page
+ */
+function addCouponCode() {
+    const label = document.querySelector('a.redeemable-label');
+    const inputField = document.querySelector('input[name="redeemableCode"]');
+
+    if (!inputField) {
+        label.click();
+    }
+
+    setTimeout(() => {
+        const inputField = document.querySelector('input[name="redeemableCode"]');
+        const applyButton = document.getElementById("applyRedeemableButton");
+
+        if (inputField && applyButton) {
+            // I had to use the native setter because of React
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+            // Change color to white to hide the coupon code
+            inputField.style.color = '#ffffff'
+            nativeInputValueSetter.call(inputField, FFLConfigs.coupon);
+
+            // Notifying React about the changes
+            const inputEvent = new Event("input", { bubbles: true });
+            inputField.dispatchEvent(inputEvent);
+
+            setTimeout(() => {
+                applyButton.click();
+            }, 100);
+            setTimeout(() => {
+            }, 500);
+        }
+    }, 200);
+}
+
+/**
+ * Filter the FFL, normal and ammo products into the filteredProducts object
+ * @returns {Promise<void>}
+ */
 async function initFFLProducts() {
     const products = await getCartProducts();
     if (!products || products.length === 0) {
@@ -453,24 +742,39 @@ async function initFFLProducts() {
         const fflField = productDetail.customFields.edges.find(field => field.node.name.toLowerCase() === 'ffl');
         let fullProductData = null;
 
+        const matchedProduct = products.find(prod => prod.productEntityId === productDetail.entityId);
+
         if (fflTypeField || fflField) {
             const matchedProduct = products.find(prod => prod.productEntityId === productDetail.entityId);
             fullProductData = {...matchedProduct, ffl_type: fflTypeField ? fflTypeField.node.value.toLowerCase() : 'firearm'};
         }
-        if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') {
+        else
+        {
+            fullProductData = {...matchedProduct};
+        }
+
+        if ((fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') || (fflField && fflField.node.value.toLowerCase() === 'yes')) {
             filteredProducts.fireArm.push(fullProductData);
-            return;
+            FFLConfigs.hasFFLProducts = true;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {
             filteredProducts.ammo.push(fullProductData);
-            return;
-        } else if (fflField && fflField.node.value.toLowerCase() === 'yes') {
-            filteredProducts.fireArm.push(fullProductData);
-            return;
+            FFLConfigs.hasFFLProducts = true;
+        } else {
+            filteredProducts.others.push(fullProductData);
+            FFLConfigs.hasNonFFLProducts = true;
+            FFLConfigs.hasRegularProducts = true;
         }
-        FFLConfigs.hasNonFFLProducts = true;
     });
+
+    if (FFLConfigs.hasFFLProducts && FFLConfigs.hasNonFFLProducts) {
+        FFLConfigs.isMixedCart = true;
+    }
 }
 
+/**
+ * Adds the React app as a step to the checkout.
+ * @returns {Promise<void>}
+ */
 async function addFFLCheckoutStep() {
     const checkoutSteps = document.querySelector('.checkout-steps');
     if (!checkoutSteps) {
@@ -499,9 +803,15 @@ async function addFFLCheckoutStep() {
     document.body.insertAdjacentHTML('beforeend', htmlTemplates.fflMessage);
 
     checkoutSteps.insertBefore(wrapperElement, checkoutSteps.firstChild);
+
+    /**
+     * @TODO: shouldn't this be displayed for ammo too?
+     */
     if (filteredProducts.fireArm.length > 0) {
         setFFLVisibility('firearm');
     }
+
+    FFLConfigs.isFflLoaded = true;
 }
 
 async function showFFLAmmoOnlyHandler(shippingConsignments) {
@@ -535,6 +845,11 @@ async function showFFLAmmoOnlyHandler(shippingConsignments) {
     FFLConfigs.previousAddressState = stateRequiresFFL ? state : null;
 }
 
+/**
+ * Returns a bool of whether the dealer address is exactly the same as the shipping address.
+ * @param shippingAddress
+ * @returns {boolean}
+ */
 function isDealerAndShippingAddressSame(shippingAddress) {
     let dealerData = FFLConfigs.selectedDealer;
     if (!shippingAddress || !dealerData) return false;
@@ -547,6 +862,12 @@ function isDealerAndShippingAddressSame(shippingAddress) {
         shippingAddress.countryCode === dealerData.countryCode;
 }
 
+/**
+ * Changes product visibility according with the type
+ *
+ * @param productType
+ * @param display
+ */
 function setFFLVisibility(productType, display = 'flex') {
     const fflItemsElement = document.querySelector('.ffl-items');
     if (filteredProducts.fireArm.length === 0 && productType === 'ammo' && display === 'none') {
@@ -630,10 +951,16 @@ async function handleDealerUpdate(event) {
         document.querySelector('#ffl-info').innerHTML = `<p>${event.data.value.addressFormatted}</p>`;
         FFLConfigs.hasAmmoOnlyMessageDisplayed = false;
 
-        if (shouldSetShippingConsignments()) {
+        // Will set consignments when there is a mixed cart
+        if (FFLConfigs.hasFFLProducts) {
             await setShippingConsignments(event.data.value);
             backToShippingCheckoutStep();
         } else if (filteredProducts.ammo.length > 0) {
+            /**
+             * @TODO: I think this is wrong. We should tell this to the user after the shipping address is set. At this point, we may not have consignments yet. This condition will not even trigger now because I'm considering ammo as an FFL product by default.
+             *
+             * @type {*|null}
+             */
             let shippingConsignments = await getShippingConsignments();
             const state = shippingConsignments?.stateOrProvinceCode;
 
@@ -652,6 +979,7 @@ async function handleDealerUpdate(event) {
         document.querySelector('#ffl-select-dealer').innerText = 'CHANGE DEALER (FFL)';
 
         hideFFLDealerModal();
+        displayAllAfterCustomer();
     }
 }
 
@@ -665,6 +993,14 @@ async function handleAmmoOnlyProducts() {
     }
 }
 
+/**
+ * Setup the observer to prevent the checkout submission
+ *
+ * @param targetSelector
+ * @param buttonSelector
+ * @param eventHandler
+ * @returns {Promise<void>}
+ */
 async function setupPreventSubmissionObserver(targetSelector, buttonSelector, eventHandler) {
     const processedElements = new WeakSet();
 
@@ -687,6 +1023,12 @@ async function setupPreventSubmissionObserver(targetSelector, buttonSelector, ev
     observer.observe(targetNode, { childList: true, subtree: true, attributes: true });
 }
 
+/**
+ * Prevents a guest user from submitting the checkout when the flag FFLConfigs.preventSubmition is true
+ * and the user has not selected a dealer yet.
+ *
+ * @returns {Promise<void>}
+ */
 async function preventGuestUserSubmissionOnLogin() {
     const eventHandler = (event) => {
         if (!FFLConfigs.isGuestUser) return;
@@ -709,6 +1051,10 @@ async function preventGuestUserSubmissionOnLogin() {
     );
 }
 
+/**
+ * Prevents checkout submission during the shipping step
+ * @returns {Promise<void>}
+ */
 async function preventSubmissionOnShipping() {
     const eventHandler = async () => {
         const shippingConsignments = await getShippingConsignments();
@@ -748,6 +1094,10 @@ function handleSubmissionOnPayment() {
     }
 }
 
+/**
+ * Sends the user back to the Customer Step on the Checkout when the user is still not logged
+ * and the login form is being displayed.
+ */
 function backToCustomerCheckoutStep() {
     const customerSelector = document.querySelector('.checkout-step--customer .stepHeader-actions button');
     if (FFLConfigs.isGuestUser && customerSelector) {
@@ -755,6 +1105,9 @@ function backToCustomerCheckoutStep() {
     }
 }
 
+/**
+ * Sends the user back to the Shipping Step on the checkout.
+ */
 function backToShippingCheckoutStep() {
     const shippingSelector = document.querySelector('.checkout-step--shipping .stepHeader-actions button');
     if (shippingSelector) {
@@ -762,6 +1115,10 @@ function backToShippingCheckoutStep() {
     }
 }
 
+/**
+ * @TODO: not sure if this is working
+ * @returns {Promise<void>}
+ */
 async function setAddressData() {
     const observerProvinceCodeInput = new MutationObserver(() => {
         const province = document.querySelector('.checkout-step--shipping #provinceCodeInput');
@@ -788,10 +1145,6 @@ async function setAddressData() {
     observerSameAsBilling.observe(targetNode, { childList: true, subtree: true, attributes: true });
 }
 
-function shouldSetShippingConsignments() {
-    return FFLConfigs.isGuestUser && !FFLConfigs.hasNonFFLProducts
-}
-
 function showMessage(message) {
     const alertBox = document.querySelector('#ffl-message');
     const alertBoxMessage = document.querySelector('#ffl-message-alert-modal');
@@ -810,9 +1163,22 @@ function hideMessage() {
     Object.assign(alertBoxMessage.style, {display: 'none', opacity: '0'});
 }
 
+/**
+ * This function creates a Mutation Observer which will verify whether the user is logged or not (guest).
+ * It will observe if the element `loggedUserStepElement` is added to the DOM. When that element shows up,
+ * the function {@link checkIfGuestUser} will be triggered.
+ *
+ * @returns {Promise<void>}
+ */
 async function handleLoginOrLogout() {
+    /**
+     * The element observed to detect user login status changes.
+     * @type {string}
+     */
+    const loggedUserStepElement = '.checkout-step.optimizedCheckout-checkoutStep.checkout-step--customer';
+
     await checkIfGuestUser();
-    const targetNode = await waitForElement('.checkout-step.optimizedCheckout-checkoutStep.checkout-step--customer');
+    const targetNode = await waitForElement(loggedUserStepElement);
     const observer = new MutationObserver(() => checkIfGuestUser());
     observer.observe(targetNode, {childList: true});
 }
@@ -828,6 +1194,19 @@ function addFFLStyle() {
     const style = document.createElement('style');
     style.textContent = FFLConfigs.css;
     document.head.append(style);
+}
+
+function handleFFLCart() {
+    preventGuestUserSubmissionOnLogin();
+    preventSubmissionOnPayment();
+    setInterval(async () => {
+        handleSubmissionOnPayment();
+    }, 3000);
+    addFFLStyle();
+    monitorShippingToggleButton();
+    handleAmmoOnlyProducts();
+    preventSubmissionOnShipping();
+    addAlertDeliveryInfo();
 }
 
 (async () => {
@@ -847,16 +1226,10 @@ function addFFLStyle() {
     }
 
     await handleLoginOrLogout();
-    preventGuestUserSubmissionOnLogin();
-    preventSubmissionOnPayment();
-    setInterval(async () => {
-        handleSubmissionOnPayment();
-    }, 3000);
-    addFFLStyle();
-    await addFFLCheckoutStep();
-    handleAmmoOnlyProducts();
-    preventSubmissionOnShipping();
-    addAlertDeliveryInfo();
-    
+
+    if (FFLConfigs.hasFFLProducts) {
+        handleFFLCart();
+    }
+
     window.addEventListener('message', handleDealerUpdate);
 })();

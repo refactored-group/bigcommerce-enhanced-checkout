@@ -59,7 +59,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
 
     if (location && radius) {
       this.setState({loading: true, currentLocation: location});
-      fetch(`https://${process.env.REACT_APP_HOST}/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
+      fetch(`${process.env.REACT_APP_HOST}/store-front/api/${this.props.storeHash}/dealers?location=${location}&radius=${radius}`,
         {
           method: "GET",
           headers: {
