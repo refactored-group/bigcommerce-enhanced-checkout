@@ -3,16 +3,15 @@ let FFLConfigs = {
     checkoutId: window.FFLCheckoutId,
     storeHash: '',
     coupon: 'FFL',
-    isGuestUser: false,
     customerData: null,
     isFflLoaded: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
     isEnhancedCheckoutEnabled: false,
     statesRequireAmmoFFL: [],
-    ammoOnlyRequireFFLMessage: 'You have selected a state where ammunition must be shipped to an FFL holder.',
-    ammoOnlyAddressChangedMessage: 'The shipping address has been updated. Please update the FFL holder.',
-    ammoOnlyNoAddressRequiredMessage: 'The selected ammunition products do not require shipping to an FFL holder and will be sent to your provided shipping address.',
+    ammoOnlyRequireFFLMessage: 'You have selected a state where ammunition must be shipped to an FFL holder.', // TODO: remove if no longer required
+    ammoOnlyAddressChangedMessage: 'The shipping address has been updated. Please update the FFL holder.', // TODO: remove if no longer required
+    ammoOnlyNoAddressRequiredMessage: 'The selected ammunition products do not require shipping to an FFL holder and will be sent to your provided shipping address.', // TODO: remove if no longer required
     ammoRequireFFL: false,
     ammoRequireFFLMessage: 'Your ammunition products will be shipped to this FFL holder due to the requirements of the selected state.',
     selectedDealer: null,
@@ -22,10 +21,6 @@ let FFLConfigs = {
     platform: 'BigCommerce',
     automaticFFLStoreInfoEndpointUrl: window.FFL_ENVIRONMENT.FFL_STORE_ENDPOINT,
     automaticFFLIframeUrl: window.FFL_ENVIRONMENT.FFL_IFRAME_URL,
-    previousAddressState: null,
-    shippingAddressReferenceMessage: 'This shipping address is for reference only. All items will be shipped directly to the designated FFL dealer.',
-    shippingAddressMixedCartMessage: 'Items not requiring an FFL will be shipped directly to this address. Items requiring an FFL will be shipped to the designated FFL dealer.',
-    hasAmmoOnlyMessageDisplayed: false,
     css: `.ffl-section .alertBox--font-color-black {
           color: #000;
           border-radius: 3px;
@@ -60,8 +55,11 @@ let FFLConfigs = {
          background-color: black;
       }
       #ffl-message-alert-modal {
+        width: 100%;
+        margin-top: 20%;
          @media (min-width: 600px) {
-             width: 470px;
+            width: 470px;
+            margin-top: initial;
          }
          display: none;
          visibility: visible;
@@ -75,6 +73,12 @@ let FFLConfigs = {
         width: 76px;
         height: 76px;
         margin: 1.25em auto 1.875em;
+      }
+      #ffl-message-alert-modal h4 {
+        margin-bottom: 10px;
+      }
+      #ffl-message-alert-modal #ffl-alert-state-info {
+        margin-top: 8px; border-radius: 6px;
       }
       #ffl-message-iframe-modal {
         display: none;
@@ -94,6 +98,11 @@ let FFLConfigs = {
           height: 90%;
           top: initial;
         }
+      }
+      #ffl-message-iframe-modal iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
       }
       #ffl-message-iframe-close {
         width: 22px;
@@ -115,15 +124,16 @@ let FFLConfigs = {
           border-bottom-right-radius: 0;
         }
       }
-      #alertDeliveryInfo {
+      #checkout-payment-continue {
+        display: none;
+      }
+      #ffl-alert-state-info {
+        display: none;
         background-color: #feffd7;
         padding: 13px 20px;
         width: 100%;
         margin-bottom: 15px;
         border-radius: 3px;
-      }
-      #checkout-payment-continue {
-        display: none;
       }
       `
 }
@@ -148,13 +158,13 @@ const htmlTemplates = {
             </div>
           </div>
           <div aria-busy="false" class="checkout-view-content checkout-view-content-enter-done">
-            <section class="ffl-section checkout-form" style="">
+            <section class="ffl-section checkout-form">
                 <div>
                   <div id="ffl-alert" class="alertBox alertBox--error alertBox--font-color-black">
                       %items%
                       %fflInfo%
                   </div>
-                  <div class="form-action"><button type="button" class="button button--primary optimizedCheckout-buttonPrimary" id="ffl-select-dealer" onclick="showFFLDealerModal(true)">SELECT YOUR DEALER (FFL)</button></div>
+                  <div class="form-action"><button type="button" class="button button--primary optimizedCheckout-buttonPrimary" id="ffl-select-dealer" onclick="showFFLDealerModal()">SELECT YOUR DEALER (FFL)</button></div>
                 </div>
             </section>
           </div>`,
@@ -174,20 +184,28 @@ const htmlTemplates = {
         <div id="ffl-message-alert-modal" class="modal modal--alert modal--small" tabindex="0">
             <div class="modal-alert-icon"><img src="${FFLConfigs.automaticFFLIframeUrl}/bigcommerce-alert-icon.svg" alt=""/></div>
             <div class="modal-content"></div>
-            <div class="button-container">
-                <button type="button" class="confirm button" onclick="hideMessage()">OK</button>
-            </div>
+            <div class="button-container"></div>
             <div class="loadingOverlay" style="display: none;"></div>
         </div>`,
+    fflMessageDefaultButton: `<button type="button" class="confirm button" onclick="hideMessage()">OK</button>`,
+    fflMessageState: `<h4>Ammunition shipments must go<br/>through an FFL dealer in some states.</h4>
+            <form id="ffl-message-state-form">
+            <div class="form-field">
+                <label for="ffl-province-code-input" id="ffl-province-code-input-label" class="form-label optimizedCheckout-form-label">Please select your shipping state:</label>
+                <div class="dropdown-chevron"><div class="icon"><svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"></path></svg></div></div><select required class="form-select optimizedCheckout-form-select" id="ffl-province-code-input" onchange="handleStateSelected()"><option value="">Select a state</option><option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AS">American Samoa</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="AA">Armed Forces Americas</option><option value="AE">Armed Forces Europe</option><option value="AP">Armed Forces Pacific</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option><option value="FM">Federated States Of Micronesia</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="GU">Guam</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MH">Marshall Islands</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="MP">Northern Mariana Islands</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PW">Palau</option><option value="PA">Pennsylvania</option><option value="PR">Puerto Rico</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VI">Virgin Islands</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option></select>
+            </div>
+            </form>
+            <div id="ffl-alert-state-info"></div>
+        </div>`,
+    fflMessageStateButton: `<button type="button" class="confirm button button--primary optimizedCheckout-buttonPrimary" onclick="handleCloseStateModal()">CONFIRM</button>`,
     fflModal: `<div id="ffl-message-iframe" class="modal-background"></div>
         <div id="ffl-message-iframe-modal" class="modal modal--alert modal--small" tabindex="0">
             <div id="ffl-message-iframe-close" onclick="hideFFLDealerModal()"><img src="${FFLConfigs.automaticFFLIframeUrl}/bigcommerce-close-icon.svg" alt=""/></div>
             <div class="modal-content">
-                <iframe src="%url%" style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe src="%url%"></iframe>
             </div>
             <div class="loadingOverlay" style="display: none;"></div>
-        </div>`,
-    alertDeliveryInfo: `<div id="alertDeliveryInfo">%message%</div>`
+        </div>`
 };
 
 const graphqlPayloads = {
@@ -394,16 +412,10 @@ async function checkIfGuestUser() {
             addFFLCheckoutStep();
             hideAllAfterCustomer();
         }
-    } else if (FFLConfigs.isFflLoaded === true && FFLConfigs.isGuestUser === false) {
+    } else if (FFLConfigs.isFflLoaded === true) {
         // Reload consignments and toggle coupon if the user logs out and in again
         await setShippingConsignments(FFLConfigs.selectedDealer);
         FFLConfigs.customerData = data.customer;
-    }
-
-    FFLConfigs.isGuestUser = !data.customer?.entityId;
-
-    if (!FFLConfigs.selectedDealer) {
-        backToCustomerCheckoutStep();
     }
 }
 
@@ -638,7 +650,6 @@ function toggleFflCoupon() {
  * Monitor the "remove" coupon link. If it shows up, click on it.
  */
 function monitorRemoveCoupon() {
-    const inputField = document.querySelector('input[name="redeemableCode"]');
     const targetNode = document.querySelector('aside.layout-cart');
     const observer = new MutationObserver((mutations, observerInstance) => {
         const removeLink = document.querySelector('a[data-test="cart-price-callback"]');
@@ -814,35 +825,66 @@ async function addFFLCheckoutStep() {
     FFLConfigs.isFflLoaded = true;
 }
 
-async function showFFLAmmoOnlyHandler(shippingConsignments) {
-    const state = shippingConsignments?.stateOrProvinceCode;
+/**
+ * Show delivery state modal if there is ammo in the cart
+ * @returns void
+ */
+async function handleStateModal() {
+    if (filteredProducts.ammo.length === 0) {
+        return;
+    }
+    showMessage(htmlTemplates.fflMessageState, htmlTemplates.fflMessageStateButton);
+}
+
+/**
+ * On state change, check if the ammo requires or not to be shipped to a Dealer
+ * @returns void
+ */
+async function handleStateSelected() {
+    const selectedState = document.getElementById('ffl-province-code-input').value;
+    const alertStateInfo = document.getElementById('ffl-alert-state-info');
+
+    if (!selectedState) {
+        alertStateInfo.style.display = 'none';
+        return;
+    }
+
+    if (FFLConfigs.statesRequireAmmoFFL.includes(selectedState)) {
+        alertStateInfo.innerHTML = `The chosen state <strong>requires</strong> an FFL for ammunition.`;
+        FFLConfigs.ammoRequireFFL = true;
+    } else {
+        alertStateInfo.innerHTML = `The chosen state <strong>doesn't require</strong> an FFL for ammunition.`;
+        FFLConfigs.ammoRequireFFL = false;
+    }
+    alertStateInfo.style.display = 'block';
+}
+
+/**
+ * Validate the state modal form and shows the ammo if required
+ * @returns void
+ */
+async function handleCloseStateModal() {
+    const fflProvinceCodeInput = document.getElementById('ffl-message-state-form');
+    fflProvinceCodeInput.checkValidity();
+    if (!fflProvinceCodeInput.checkValidity()) {
+        fflProvinceCodeInput.reportValidity()
+        return;
+    }
+    if (FFLConfigs.ammoRequireFFL) {
+        setFFLVisibility('ammo');
+    }
+    hideMessage();
+}
+
+/**
+ * TODO: Check if state changed and return customer to the initial step
+ */
+async function checkIfStateChanged(shippingConsignments) {
+    const state = shippingConsignments?.stateOrProvinceCode; // use the state defined on the modal instead
     const isSameAddress = isDealerAndShippingAddressSame(shippingConsignments)
     const hasAmmo = filteredProducts.ammo.length > 0;
     const ammoOnly = filteredProducts.fireArm.length === 0 && filteredProducts.ammo.length > 0 && !FFLConfigs.hasNonFFLProducts;
     const stateRequiresFFL = FFLConfigs.statesRequireAmmoFFL.includes(state)
-
-    if (hasAmmo && state && stateRequiresFFL) {
-        setFFLVisibility('ammo');
-        if (!FFLConfigs.selectedDealer) {
-            showMessage(FFLConfigs.ammoOnlyRequireFFLMessage);
-        } else if(!isSameAddress && ammoOnly) {
-            FFLConfigs.selectedDealer = false;
-            const fflAlert = document.querySelector('#ffl-alert');
-            fflAlert.classList.remove('alertBox--success');
-            fflAlert.classList.add('alertBox--error');
-            document.querySelector('#ffl-info').innerHTML = htmlTemplates.fflInfo;
-            showMessage(FFLConfigs.ammoOnlyAddressChangedMessage);
-        } else if (!ammoOnly && !FFLConfigs.hasAmmoOnlyMessageDisplayed) {
-            FFLConfigs.hasAmmoOnlyMessageDisplayed = true;
-            showMessage(FFLConfigs.ammoRequireFFLMessage)
-        }
-    } else if (hasAmmo && !isSameAddress && FFLConfigs.previousAddressState && FFLConfigs.previousAddressState !== state) {
-        setFFLVisibility('ammo', 'none');
-        showMessage(FFLConfigs.ammoOnlyNoAddressRequiredMessage);
-    } else if (!isSameAddress) {
-        setFFLVisibility('ammo', 'none');
-    }
-    FFLConfigs.previousAddressState = stateRequiresFFL ? state : null;
 }
 
 /**
@@ -880,57 +922,15 @@ function setFFLVisibility(productType, display = 'flex') {
         FFLConfigs.ammoRequireFFL = display === 'flex';
     }
     FFLConfigs.preventSubmition = true;
-    fflItemsElement.style.display = 'block';
+    if (fflItemsElement) {
+        fflItemsElement.style.display = 'block';
+    }
     document.querySelectorAll(`.ffl-item.ffl-${productType}`).forEach(function (element) {
         element.style.display = display;
     });
 }
 
-async function addAlertDeliveryInfo() {
-    setTimeout(() => {
-        handleAlertDeliveryInfo()
-    }, 1000);
-    const observer = new MutationObserver(() => {
-        handleAlertDeliveryInfo()
-    });
-    const targetNode = await waitForElement('.checkout-step--shipping');
-    observer.observe(targetNode, { childList: true });
-}
-
-function handleAlertDeliveryInfo() {
-    let display = 'block', message;
-
-    const hasFireArmProducts = filteredProducts.fireArm.length > 0;
-    const hasAmmoProducts = filteredProducts.ammo.length > 0;
-    const isMixedCart = FFLConfigs.hasNonFFLProducts && (hasFireArmProducts || (hasAmmoProducts && FFLConfigs.ammoRequireFFL));
-    const isAmmoOnlyWithFFL = !FFLConfigs.hasNonFFLProducts && (!hasAmmoProducts || hasAmmoProducts && FFLConfigs.ammoRequireFFL);
-    const isMixedAmmoAndFirearm = !FFLConfigs.hasNonFFLProducts && hasFireArmProducts && hasAmmoProducts && !FFLConfigs.ammoRequireFFL;
-
-    if (isMixedCart || isMixedAmmoAndFirearm) {
-        message = FFLConfigs.shippingAddressMixedCartMessage;
-    } else if (isAmmoOnlyWithFFL) {
-        message = FFLConfigs.shippingAddressReferenceMessage;
-    } else {
-        display = 'none';
-    }
-
-    const alertDeliveryInfoDiv = document.querySelector('#alertDeliveryInfo');
-    if (alertDeliveryInfoDiv) {
-        Object.assign(alertDeliveryInfoDiv.style, {display: display});
-        alertDeliveryInfoDiv.textContent = message;
-    } else if (display === 'block') {
-        const content = htmlTemplates.alertDeliveryInfo.replace('%message%', message)
-        let shippingForm = document.querySelector('.checkout-step--shipping .checkout-form');
-        if (shippingForm) {
-            shippingForm.insertAdjacentHTML('beforebegin', content);
-        }
-    }
-}
-
-function showFFLDealerModal(forceBackToCustomerCheckoutStep = false) {
-    if (forceBackToCustomerCheckoutStep && FFLConfigs.isGuestUser && !FFLConfigs.hasNonFFLProducts) {
-        backToCustomerCheckoutStep();
-    }
+function showFFLDealerModal() {
     const alertBox = document.querySelector('#ffl-message-iframe');
     const alertBoxMessage = document.querySelector('#ffl-message-iframe-modal');
     Object.assign(alertBox.style, {display: 'block', opacity: '0.8'});
@@ -949,7 +949,6 @@ async function handleDealerUpdate(event) {
     if (event?.data?.type === 'dealerUpdate') {
         FFLConfigs.selectedDealer = event.data.value;
         document.querySelector('#ffl-info').innerHTML = `<p>${event.data.value.addressFormatted}</p>`;
-        FFLConfigs.hasAmmoOnlyMessageDisplayed = false;
 
         // Will set consignments when there is a mixed cart
         if (FFLConfigs.hasFFLProducts) {
@@ -980,16 +979,6 @@ async function handleDealerUpdate(event) {
 
         hideFFLDealerModal();
         displayAllAfterCustomer();
-    }
-}
-
-async function handleAmmoOnlyProducts() {
-    let shippingConsignments = await getShippingConsignments();
-    const noFireArmItems = filteredProducts.fireArm.length === 0;
-
-    if ((FFLConfigs.isGuestUser && noFireArmItems && shippingConsignments) ||
-        (!FFLConfigs.isGuestUser && (noFireArmItems || shippingConsignments))) {
-        showFFLAmmoOnlyHandler(shippingConsignments);
     }
 }
 
@@ -1024,41 +1013,13 @@ async function setupPreventSubmissionObserver(targetSelector, buttonSelector, ev
 }
 
 /**
- * Prevents a guest user from submitting the checkout when the flag FFLConfigs.preventSubmition is true
- * and the user has not selected a dealer yet.
- *
- * @returns {Promise<void>}
- */
-async function preventGuestUserSubmissionOnLogin() {
-    const eventHandler = (event) => {
-        if (!FFLConfigs.isGuestUser) return;
-
-        const passwordInput = document.querySelector('.checkout-step--customer #password');
-        if (passwordInput && passwordInput.offsetParent !== null) return;
-
-        if (FFLConfigs.preventSubmition && !FFLConfigs.selectedDealer) {
-            event.preventDefault();
-            showMessage(FFLConfigs.preventSubmitionMessage);
-        } else {
-            setAddressData();
-        }
-    };
-
-    await setupPreventSubmissionObserver(
-        '.checkout-step--customer',
-        '#checkout-shipping-continue',
-        eventHandler
-    );
-}
-
-/**
  * Prevents checkout submission during the shipping step
  * @returns {Promise<void>}
  */
 async function preventSubmissionOnShipping() {
     const eventHandler = async () => {
-        const shippingConsignments = await getShippingConsignments();
-        showFFLAmmoOnlyHandler(shippingConsignments);
+        const shippingConsignments = await getShippingConsignments(); // TODO: may no longer be required because we will get the state info from a modal
+        checkIfStateChanged(shippingConsignments);
     };
 
     await setupPreventSubmissionObserver(
@@ -1095,17 +1056,6 @@ function handleSubmissionOnPayment() {
 }
 
 /**
- * Sends the user back to the Customer Step on the Checkout when the user is still not logged
- * and the login form is being displayed.
- */
-function backToCustomerCheckoutStep() {
-    const customerSelector = document.querySelector('.checkout-step--customer .stepHeader-actions button');
-    if (FFLConfigs.isGuestUser && customerSelector) {
-        customerSelector.click();
-    }
-}
-
-/**
  * Sends the user back to the Shipping Step on the checkout.
  */
 function backToShippingCheckoutStep() {
@@ -1115,44 +1065,21 @@ function backToShippingCheckoutStep() {
     }
 }
 
-/**
- * @TODO: not sure if this is working
- * @returns {Promise<void>}
- */
-async function setAddressData() {
-    const observerProvinceCodeInput = new MutationObserver(() => {
-        const province = document.querySelector('.checkout-step--shipping #provinceCodeInput');
-        if (province && !province.value) {
-            province.value = FFLConfigs.selectedDealer.stateOrProvinceCode;
-            province.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-            observerProvinceCodeInput.disconnect();
-        }
-    });
-    const observerSameAsBilling = new MutationObserver(() => {
-        const sameAsBilling = document.querySelector('.checkout-step--shipping #sameAsBilling');
-        if (sameAsBilling) {
-            if (sameAsBilling.checked) {
-                setTimeout(() => {
-                    sameAsBilling.click();
-                }, 500);
-                observerSameAsBilling.disconnect();
-            }
-        }
-    })
-
-    const targetNode = await waitForElement('.checkout-step--shipping');
-    observerProvinceCodeInput.observe(targetNode, { childList: true, subtree: true, attributes: true });
-    observerSameAsBilling.observe(targetNode, { childList: true, subtree: true, attributes: true });
-}
-
-function showMessage(message) {
+function showMessage(message, customButton = false) {
     const alertBox = document.querySelector('#ffl-message');
     const alertBoxMessage = document.querySelector('#ffl-message-alert-modal');
     const alertBoxMessageContent = document.querySelector('#ffl-message-alert-modal .modal-content');
+    const buttonContainer = document.querySelector('#ffl-message-alert-modal .button-container');
+
     Object.assign(alertBox.style, {display: 'block', opacity: '0.8'});
     Object.assign(alertBoxMessage.style, {display: 'block', opacity: '1'});
 
-    alertBoxMessageContent.innerText = message;
+    alertBoxMessageContent.innerHTML = message;
+    if (customButton) {
+        buttonContainer.innerHTML = customButton;
+    } else {
+        buttonContainer.innerHTML = htmlTemplates.fflMessageDefaultButton;
+    }
 }
 
 function hideMessage() {
@@ -1197,16 +1124,14 @@ function addFFLStyle() {
 }
 
 function handleFFLCart() {
-    preventGuestUserSubmissionOnLogin();
+    handleStateModal();
     preventSubmissionOnPayment();
     setInterval(async () => {
         handleSubmissionOnPayment();
     }, 3000);
     addFFLStyle();
     monitorShippingToggleButton();
-    handleAmmoOnlyProducts();
     preventSubmissionOnShipping();
-    addAlertDeliveryInfo();
 }
 
 (async () => {
