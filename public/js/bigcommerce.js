@@ -4,7 +4,9 @@ let FFLConfigs = {
     storeHash: '',
     coupon: 'FFL',
     customerData: null,
+    customerSelectedState: null,
     isFflLoaded: false,
+    isRunningShippingObserver: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
     isEnhancedCheckoutEnabled: false,
@@ -488,6 +490,48 @@ async function getShippingConsignments() {
 }
 
 /**
+ * This function deletes all consignments in the current cart
+ * @returns {Promise<void>}
+ */
+async function deleteAllConsignments() {
+    try {
+        const data = await fetchGraphQLData(`
+            query {
+                site {
+                    checkout {
+                        shippingConsignments {
+                            entityId
+                        }
+                    }
+                }
+            }
+        `);
+
+        const consignments = data?.site?.checkout?.shippingConsignments || [];
+
+        for (const consignment of consignments) {
+            await fetchGraphQLData(`
+                mutation {
+                    checkout {
+                        deleteCheckoutConsignment(input: {
+                            checkoutEntityId: "${FFLConfigs.checkoutId}",
+                            consignmentEntityId: "${consignment.entityId}"
+                        }) {
+                            checkout {
+                                entityId
+                            }
+                        }
+                    }
+                }
+            `);
+        }
+
+    } catch (error) {
+        console.error("Failed to delete consignments:", error);
+    }
+}
+
+/**
  * Creates separate consignments for regular and FFL products.
  * The first consignment will have the dealer address data, while the second consignment has invalid data.
  * DO NOT remove the empty space in the `city` field. If all fields are empty, BigCommerce will just ignore
@@ -497,8 +541,11 @@ async function getShippingConsignments() {
  * @returns {Promise<void>}
  */
 async function setShippingConsignments(dealerData) {
+    await deleteAllConsignments();
+
     const fflLineItems = [];
     const otherLineItems = []
+    const shipAmmoWithFfl = FFLConfigs.statesRequireAmmoFFL.includes(dealerData.stateOrProvinceCode);
 
     filteredProducts.fireArm.forEach(product => {
         fflLineItems.push({
@@ -508,10 +555,18 @@ async function setShippingConsignments(dealerData) {
     });
 
     filteredProducts.ammo.forEach(product => {
-        fflLineItems.push({
-            lineItemEntityId: product.entityId,
-            quantity: product.quantity,
-        });
+        // Ship ammo with FFL or Other products
+        if (shipAmmoWithFfl) {
+            fflLineItems.push({
+                lineItemEntityId: product.entityId,
+                quantity: product.quantity,
+            });
+        } else {
+            otherLineItems.push({
+                lineItemEntityId: product.entityId,
+                quantity: product.quantity,
+            });
+        }
     });
 
     filteredProducts.others.forEach(product => {
@@ -522,6 +577,13 @@ async function setShippingConsignments(dealerData) {
             }
         );
     })
+
+    /**
+     * Now verify again if the cart is mixed, and if there is an FFL product in it, according with the new
+     * established criteria.
+     */
+    FFLConfigs.hasFFLProducts = fflLineItems.length > 0;
+    FFLConfigs.isMixedCart = otherLineItems.length > 0 && FFLConfigs.hasFFLProducts;
 
     // Mixed carts need 2 consignments. Orders with FFL items only need just one.
     let customConsignments = [];
@@ -586,7 +648,6 @@ async function setShippingConsignments(dealerData) {
     }
 
     if (customConsignments.length > 0) {
-        // Hide and add address block
         const variables = {
             addCheckoutShippingConsignmentsInput: {
                 checkoutEntityId: FFLConfigs.checkoutId,
@@ -606,6 +667,37 @@ async function setShippingConsignments(dealerData) {
         setTimeout(() => {
             updateAddressDisplay(dealerData);
         }, 5000);
+
+        if (customConsignments.length === 1 && !FFLConfigs.isRunningShippingObserver) {
+            // Hide and add address block
+            hideShippingStepAndAddAddressBlock();
+
+            // Create a MutationObserver to watch for changes in the DOM
+            const observer = new MutationObserver(() => {
+                hideShippingStepAndAddAddressBlock();
+            });
+
+            // Start observing the body for added/changed elements
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            FFLConfigs.isRunningShippingObserver = true;
+        }
+    }
+}
+
+function hideShippingStepAndAddAddressBlock() {
+    const checkoutStep = document.querySelector('#checkoutShippingAddress');
+    if (checkoutStep && checkoutStep.style.display !== 'none') {
+        // Add address block again
+        insertFFLConsignmentBlock(FFLConfigs.selectedDealer);
+        const shippingHeader = document.getElementsByClassName('shipping-header')[0];
+        // Hide shipping header
+        shippingHeader.style.display = 'none';
+        // Hide shipping section
+        checkoutStep.style.display = 'none';
     }
 }
 
@@ -845,6 +937,7 @@ async function handleStateModal() {
  */
 async function handleStateSelected() {
     const selectedState = document.getElementById('ffl-province-code-input').value;
+    FFLConfigs.customerSelectedState = selectedState;
     const alertStateInfo = document.getElementById('ffl-alert-state-info');
 
     if (!selectedState) {
@@ -934,6 +1027,11 @@ function setFFLVisibility(productType, display = 'flex') {
 }
 
 function showFFLDealerModal() {
+    if (!FFLConfigs.isMixedCart && FFLConfigs.selectedDealer !== null) {
+        // We can't update the address if it is just one consignment, so we need to reload the page
+        window.location.reload();
+        return;
+    }
     const alertBox = document.querySelector('#ffl-message-iframe');
     const alertBoxMessage = document.querySelector('#ffl-message-iframe-modal');
     Object.assign(alertBox.style, {display: 'block', opacity: '0.8'});
@@ -952,6 +1050,11 @@ async function handleDealerUpdate(event) {
     if (event?.data?.type === 'dealerUpdate') {
         FFLConfigs.selectedDealer = event.data.value;
         document.querySelector('#ffl-info').innerHTML = `<p>${event.data.value.addressFormatted}</p>`;
+
+        // Verify if State is the same chosen by the user
+        if (event.data.value.stateOrProvinceCode !== FFLConfigs.customerSelectedState) {
+            // @TODO: User selected an ammo state different from the dealer. Show message
+        }
 
         // Will set consignments when there is a mixed cart
         if (FFLConfigs.hasFFLProducts) {
@@ -1161,3 +1264,34 @@ function handleFFLCart() {
 
     window.addEventListener('message', handleDealerUpdate);
 })();
+
+/**
+ * Insert block displaying the dealer shipping address, when just one consignment is created
+ */
+function insertFFLConsignmentBlock() {
+    const containerHtml = `
+        <div class="consignment-container">
+            <div class="consignment-header"><h3>Destination</h3></div>
+            <div class="form-field">
+                <div class="dropdown--select">
+                    <div id="ffl-dealer-consignment-address">
+                        <b>${FFLConfigs.selectedDealer.company}</b> — ${FFLConfigs.selectedDealer.address1}, ${FFLConfigs.selectedDealer.city}, ${FFLConfigs.selectedDealer.stateOrProvinceCode}, ${FFLConfigs.selectedDealer.postalCode}, ${FFLConfigs.selectedDealer.phone}
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="customerView-actions">
+                    <button class="button button--tertiary button--tiny optimizedCheckout-buttonSecondary"
+                            data-test="go-back-to-ffl" type="button" onclick="javascript:window.location.reload()">Edit</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const target = document.querySelector('#checkoutShippingAddress');
+
+    // Add block before the checkout shipping address header
+    if (target && target.parentNode) {
+        target.insertAdjacentHTML('beforebegin', containerHtml);
+    }
+}
