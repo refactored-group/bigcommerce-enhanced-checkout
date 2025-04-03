@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { APIProvider, Map } from '@vis.gl/react-google-maps';
 import Markers from './Markers'
 import { mapConfigs } from './constants';
-import { IProps } from './types';
+import { LocatorMapProps } from './types';
 import { useEffect } from 'react';
 
-const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, showMap, handleActiveDealer }: IProps) => {
+const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, showMap, handleActiveDealer }: LocatorMapProps) => {
   const [state, setState] = useState({
     activeMarker: null,
     activeDealer: null,
