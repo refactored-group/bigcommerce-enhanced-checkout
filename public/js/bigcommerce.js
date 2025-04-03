@@ -524,7 +524,7 @@ async function setShippingConsignments(dealerData) {
     })
 
     // Mixed carts need 2 consignments. Orders with FFL items only need just one.
-    let customConsignments;
+    let customConsignments = [];
 
     if (FFLConfigs.isMixedCart) {
         customConsignments = [
@@ -563,7 +563,7 @@ async function setShippingConsignments(dealerData) {
                 lineItems: otherLineItems
             }
         ]
-    } else {
+    } else if (FFLConfigs.hasFFLProducts) {
         customConsignments = [
             {
                 address: {
@@ -585,25 +585,28 @@ async function setShippingConsignments(dealerData) {
         ]
     }
 
-    const variables = {
-        addCheckoutShippingConsignmentsInput: {
-            checkoutEntityId: FFLConfigs.checkoutId,
-            data: {
-                consignments: customConsignments
+    if (customConsignments.length > 0) {
+        // Hide and add address block
+        const variables = {
+            addCheckoutShippingConsignmentsInput: {
+                checkoutEntityId: FFLConfigs.checkoutId,
+                data: {
+                    consignments: customConsignments
+                }
             }
-        }
-    };
-    await fetchGraphQLData(graphqlPayloads.shippingConsignmentsMutation, variables);
+        };
+        await fetchGraphQLData(graphqlPayloads.shippingConsignmentsMutation, variables);
 
-    /**
-     * Adds and removes a coupon from the cart to force the DOM update
-     */
-    toggleFflCoupon();
-    // Not ideal to use setTimeout here but this is not sensitive information, since we already have this data
-    // on the FFL Selector.
-    setTimeout(() => {
-        updateAddressDisplay(dealerData);
-    }, 5000);
+        /**
+         * Adds and removes a coupon from the cart to force the DOM update
+         */
+        toggleFflCoupon();
+        // Not ideal to use setTimeout here but this is not sensitive information, since we already have this data
+        // on the FFL Selector.
+        setTimeout(() => {
+            updateAddressDisplay(dealerData);
+        }, 5000);
+    }
 }
 
 /**
