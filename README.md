@@ -68,7 +68,12 @@ file is loaded with the environment variables before loading the enhanced checko
     /** Hide all checkout steps. They will be displayed automatically when no FFL is needed or after it has been selected. **/
     const css = `.checkout-step--shipping, .checkout-step--billing, .checkout-step--payment {
         display: none;
-    }`;
+    }
+    /** Hides third consignment ** /
+    div.consignment-container + div.consignment-container + div.consignment-container {
+            display: none !important;
+      }
+    `;
     
     const style = document.createElement('style');
     style.textContent = css;
