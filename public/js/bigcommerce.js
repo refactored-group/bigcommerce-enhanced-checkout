@@ -27,6 +27,10 @@ let FFLConfigs = {
           color: #000;
           border-radius: 3px;
       }
+      // Hides 3rd consignment (we will never use it). If empty, checkout will delete it for us.
+      div.consignment-container + div.consignment-container + div.consignment-container {
+            display: none !important;
+      }
      .checkout-form div:nth-child(3) .dropdownTrigger, .checkout-form div:nth-child(3) .alertBox--error {
         display: none;
       }
@@ -405,34 +409,40 @@ async function checkIfGuestUser() {
     if (filteredProducts.fireArm.length === 0) {
         return;
     }
+
     const data = await fetchGraphQLData(graphqlPayloads.userInformationQuery);
 
     // User logs in
     if (FFLConfigs.isFflLoaded === false && data.customer?.entityId) {
         FFLConfigs.customerData = data.customer;
         if (FFLConfigs.hasFFLProducts) {
-            addFFLCheckoutStep();
-            hideAllAfterCustomer();
+            const targetSelector = '.checkout-steps';
+            // Also check immediately in case it's already in the DOM
+            if (document.querySelector(targetSelector)) {
+                addFFLCheckoutStep();
+            } else {
+                // The element os not loaded yet; init observer
+                const observer = new MutationObserver((mutations, observerInstance) => {
+                    const checkoutSteps = document.querySelector(targetSelector);
+                    if (checkoutSteps) {
+                        addFFLCheckoutStep();
+                        observerInstance.disconnect();
+                    }
+                });
+
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+        } else {
+            displayAllAfterCustomer();
         }
     } else if (FFLConfigs.isFflLoaded === true) {
         // Reload consignments and toggle coupon if the user logs out and in again
         await setShippingConsignments(FFLConfigs.selectedDealer);
         FFLConfigs.customerData = data.customer;
     }
-}
-
-/**
- * Hides all checkout steps after Customer
- */
-function hideAllAfterCustomer()
-{
-    const shippingSection =  document.querySelector('.checkout-step--shipping');
-    const billingSection =  document.querySelector('.checkout-step--billing');
-    const paymentSection =  document.querySelector('.checkout-step--payment');
-
-    shippingSection.style.display = 'none';
-    billingSection.style.display = 'none';
-    paymentSection.style.display = 'none';
 }
 
 /**
@@ -585,6 +595,10 @@ async function setShippingConsignments(dealerData) {
     FFLConfigs.hasFFLProducts = fflLineItems.length > 0;
     FFLConfigs.isMixedCart = otherLineItems.length > 0 && FFLConfigs.hasFFLProducts;
 
+    // Updates customer data
+    const customerData = await fetchGraphQLData(graphqlPayloads.userInformationQuery);
+    FFLConfigs.customerData = customerData.customer;
+
     // Mixed carts need 2 consignments. Orders with FFL items only need just one.
     let customConsignments = [];
 
@@ -668,7 +682,7 @@ async function setShippingConsignments(dealerData) {
             updateAddressDisplay(dealerData);
         }, 5000);
 
-        if (customConsignments.length === 1 && !FFLConfigs.isRunningShippingObserver) {
+        if (customConsignments.length < 2 && !FFLConfigs.isRunningShippingObserver) {
             // Hide and add address block
             hideShippingStepAndAddAddressBlock();
 
@@ -902,11 +916,11 @@ async function addFFLCheckoutStep() {
     let fflTemplate = htmlTemplates.fflStep.replace('%items%', itemsHTML)
         .replace('%fflInfo%', htmlTemplates.fflInfo);
     fflTemplate += htmlTemplates.fflModal.replace('%url%', `${FFLConfigs.automaticFFLIframeUrl}?store_hash=${FFLConfigs.storeHash}&platform=${FFLConfigs.platform}`);
+
     const wrapperElement = document.createElement('li');
     wrapperElement.classList.add('checkout-step', 'optimizedCheckout-checkoutStep', 'checkout-step--shipping-ffl', 'ffl-items');
     wrapperElement.style.display = 'none';
     wrapperElement.innerHTML = fflTemplate;
-    document.body.insertAdjacentHTML('beforeend', htmlTemplates.fflMessage);
 
     checkoutSteps.insertBefore(wrapperElement, checkoutSteps.firstChild);
 
@@ -928,6 +942,7 @@ async function handleStateModal() {
     if (filteredProducts.ammo.length === 0) {
         return;
     }
+
     showMessage(htmlTemplates.fflMessageState, htmlTemplates.fflMessageStateButton);
 }
 
@@ -966,8 +981,13 @@ async function handleCloseStateModal() {
         fflProvinceCodeInput.reportValidity()
         return;
     }
+
     if (FFLConfigs.ammoRequireFFL) {
+        // Display FFL block if not being displayed yet
+        addFFLCheckoutStep();
         setFFLVisibility('ammo');
+    } else if (!FFLConfigs.ammoRequireFFL && !FFLConfigs.hasFFLProducts) {
+        displayAllAfterCustomer();
     }
     hideMessage();
 }
@@ -1241,6 +1261,9 @@ function handleFFLCart() {
 }
 
 (async () => {
+    // Inject modal container
+    document.body.insertAdjacentHTML('beforeend', htmlTemplates.fflMessage);
+
     if (!FFLConfigs.storefrontApiToken || !FFLConfigs.checkoutId) {
         console.error("FFL Shipment: Missing script params.");
         return;
@@ -1248,11 +1271,13 @@ function handleFFLCart() {
     await initFFLProducts();
     if (filteredProducts.fireArm.length === 0 && filteredProducts.ammo.length === 0) {
         console.log("FFL Shipment: No FFL products in the cart.");
+        displayAllAfterCustomer();
         return;
     }
     await initFFLConfigs();
     if (!FFLConfigs.isEnhancedCheckoutEnabled) {
         console.log("FFL Shipment: FFL is disabled.");
+        displayAllAfterCustomer();
         return;
     }
 
@@ -1260,6 +1285,8 @@ function handleFFLCart() {
 
     if (FFLConfigs.hasFFLProducts) {
         handleFFLCart();
+    } else {
+        displayAllAfterCustomer();
     }
 
     window.addEventListener('message', handleDealerUpdate);
