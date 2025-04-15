@@ -65,6 +65,16 @@ file is loaded with the environment variables before loading the enhanced checko
 
 ```
 <script>
+    /** Hide all checkout steps. They will be displayed automatically when no FFL is needed or after it has been selected. **/
+    const css = `.checkout-step--shipping, .checkout-step--billing, .checkout-step--payment {
+        display: none;
+    }`;
+    
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.append(style);
+    
+    // Get Storefront Configuration data
     window.FFLStorefrontApiToken = '{{settings.storefront_api.token}}';
     window.FFLCheckoutId = '{{checkout.id}}';
     
