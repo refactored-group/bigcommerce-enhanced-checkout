@@ -901,6 +901,10 @@ async function addFFLCheckoutStep() {
         console.error("FFL Shipment: Checkout steps container not found.");
         return;
     }
+    // This is already being displayed
+    if (FFLConfigs.isFflLoaded === true) {
+        return;
+    }
 
     const itemsHTML = [...filteredProducts.fireArm, ...filteredProducts.ammo].map(product => {
         return htmlTemplates.fflItems
