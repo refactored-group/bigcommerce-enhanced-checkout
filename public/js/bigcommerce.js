@@ -6,6 +6,9 @@ let FFLConfigs = {
     customerData: null,
     customerSelectedState: null,
     isFflLoaded: false,
+    hasRegularProducts: false,
+    hasAmmo: false,
+    hasFirearm: false,
     isRunningShippingObserver: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
@@ -876,9 +879,11 @@ async function initFFLProducts() {
         if ((fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') || (fflField && fflField.node.value.toLowerCase() === 'yes')) {
             filteredProducts.fireArm.push(fullProductData);
             FFLConfigs.hasFFLProducts = true;
+            FFLConfigs.hasFirearm = true;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {
             filteredProducts.ammo.push(fullProductData);
             FFLConfigs.hasFFLProducts = true;
+            FFLConfigs.hasAmmo = true;
         } else {
             filteredProducts.others.push(fullProductData);
             FFLConfigs.hasNonFFLProducts = true;
@@ -990,7 +995,7 @@ async function handleCloseStateModal() {
         // Display FFL block if not being displayed yet
         addFFLCheckoutStep();
         setFFLVisibility('ammo');
-    } else if (!FFLConfigs.ammoRequireFFL && !FFLConfigs.hasFFLProducts) {
+    } else if (!FFLConfigs.hasFirearm) {
         displayAllAfterCustomer();
     }
     hideMessage();
@@ -1160,7 +1165,10 @@ async function preventSubmissionOnShipping() {
 }
 
 async function preventSubmissionOnPayment() {
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(async () => {
+        const test = await checkAmmoShippingAddress();
+
+
         handleSubmissionOnPayment();
     });
 
@@ -1168,11 +1176,21 @@ async function preventSubmissionOnPayment() {
     observer.observe(targetNode, { childList: true, subtree: true, attributes: true });
 }
 
+async function checkAmmoShippingAddress()
+{
+    console.log("getShippingConsignments()");
+    const con = await getShippingConsignments();
+    console.log(con);
+    // address1.stateOrProvinceCode = FF
+    //event.preventDefault();
+}
+
 function handleSubmissionOnPayment() {
     const element = document.querySelector("#checkout-payment-continue");
     if (element && !element.dataset.preventSubmissionEvent) {
         element.style.display = 'block';
-        element.addEventListener('click', (event) => {
+        element.addEventListener('click', async (event) => {
+            event.preventDefault();
             if (FFLConfigs.preventSubmition && !FFLConfigs.selectedDealer) {
                 event.preventDefault();
                 setTimeout(() => {
@@ -1180,6 +1198,10 @@ function handleSubmissionOnPayment() {
                 }, 1000);
                 showMessage(FFLConfigs.preventSubmitionMessage);
             }
+
+            // Verifica se o primeiro consignment tem o estado correto se for só um
+            // verifica se o segundo consignment tem o estado correto se forem dois
+
         });
         element.dataset.preventSubmissionEvent = "true";
     }
