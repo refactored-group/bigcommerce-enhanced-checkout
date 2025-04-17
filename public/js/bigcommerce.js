@@ -295,6 +295,17 @@ const graphqlPayloads = {
         }
       }
     `,
+    shippingConsignmentsIdsQuery:`
+            query {
+                site {
+                    checkout {
+                        shippingConsignments {
+                            entityId
+                        }
+                    }
+                }
+            }
+        `,
     shippingConsignmentsQuery: `
       query {
         site {
@@ -313,6 +324,20 @@ const graphqlPayloads = {
         }
       }
     `,
+    shippingConsignmentsDeleteQuery: (id) => `
+    mutation {
+        checkout {
+            deleteCheckoutConsignment(input: {
+                checkoutEntityId: "${FFLConfigs.checkoutId}",
+                consignmentEntityId: "${id}"
+            }) {
+                checkout {
+                    entityId
+                }
+            }
+        }
+    }
+`,
     shippingConsignmentsMutation: `
       mutation addCheckoutShippingConsignments(
   $addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!
@@ -518,51 +543,19 @@ async function getAllShippingConsignments() {
  */
 async function deleteAllConsignments() {
     try {
-        const data = await fetchGraphQLData(`
-            query {
-                site {
-                    checkout {
-                        shippingConsignments {
-                            entityId
-                        }
-                    }
-                }
-            }
-        `);
-
+        const data = await fetchGraphQLData(graphqlPayloads.shippingConsignmentsIdsQuery);
         const consignments = data?.site?.checkout?.shippingConsignments || [];
 
+        let deleteQuery;
         for (const consignment of consignments) {
-            await fetchGraphQLData(`
-                mutation {
-                    checkout {
-                        deleteCheckoutConsignment(input: {
-                            checkoutEntityId: "${FFLConfigs.checkoutId}",
-                            consignmentEntityId: "${consignment.entityId}"
-                        }) {
-                            checkout {
-                                entityId
-                            }
-                        }
-                    }
-                }
-            `);
+            deleteQuery = fetchGraphQLData.shippingConsignmentsDeleteQuery(consignment.entityId);
+            await fetchGraphQLData(deleteQuery);
         }
         // Wait for a little bit to make sure the delete consignments have been updated
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // We need to get them again to update the state
-        const updatedData = await fetchGraphQLData(`
-            query {
-                site {
-                    checkout {
-                        shippingConsignments {
-                            entityId
-                        }
-                    }
-                }
-            }
-        `);
+        const updatedData = await fetchGraphQLData(fetchGraphQLData.shippingConsignmentsQuery);
 
     } catch (error) {
         console.error("Failed to delete consignments:", error);
