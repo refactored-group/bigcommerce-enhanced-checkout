@@ -324,7 +324,8 @@ const graphqlPayloads = {
         }
       }
     `,
-    shippingConsignmentsDeleteQuery: (id) => `
+    shippingConsignmentsDeleteQuery: (id) => {
+        return `
     mutation {
         checkout {
             deleteCheckoutConsignment(input: {
@@ -337,7 +338,7 @@ const graphqlPayloads = {
             }
         }
     }
-`,
+`},
     shippingConsignmentsMutation: `
       mutation addCheckoutShippingConsignments(
   $addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!
@@ -548,7 +549,7 @@ async function deleteAllConsignments() {
 
         let deleteQuery;
         for (const consignment of consignments) {
-            deleteQuery = fetchGraphQLData.shippingConsignmentsDeleteQuery(consignment.entityId);
+            deleteQuery = graphqlPayloads.shippingConsignmentsDeleteQuery(consignment.entityId);
             await fetchGraphQLData(deleteQuery);
         }
         // Wait for a little bit to make sure the delete consignments have been updated
