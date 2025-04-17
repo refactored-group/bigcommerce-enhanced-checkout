@@ -6,11 +6,16 @@ let FFLConfigs = {
     customerData: null,
     customerSelectedState: null,
     isFflLoaded: false,
+    hasRegularProducts: false,
+    hasAmmo: false,
+    hasFirearm: false,
+    consignmentWithAmmo: null,
     isRunningShippingObserver: false,
     preventSubmition: false,
     preventSubmitionMessage: 'Please complete the FFL selection.',
     isEnhancedCheckoutEnabled: false,
     statesRequireAmmoFFL: [],
+    selectDealerMessage: "Due to local laws, we are unable to deliver ammunition directly to residential addresses in this state. Please, Choose a licensed FFL Dealer to receive your order or select a different shipping address.",
     ammoOnlyRequireFFLMessage: 'You have selected a state where ammunition must be shipped to an FFL holder.', // TODO: remove if no longer required
     ammoOnlyAddressChangedMessage: 'The shipping address has been updated. Please update the FFL holder.', // TODO: remove if no longer required
     ammoOnlyNoAddressRequiredMessage: 'The selected ammunition products do not require shipping to an FFL holder and will be sent to your provided shipping address.', // TODO: remove if no longer required
@@ -194,6 +199,7 @@ const htmlTemplates = {
             <div class="loadingOverlay" style="display: none;"></div>
         </div>`,
     fflMessageDefaultButton: `<button type="button" class="confirm button" onclick="hideMessage()">OK</button>`,
+    fflChooseDealerButton: `<button type="button" class="confirm button" onclick="window.location.reload()">OK</button>`,
     fflMessageState: `<h4>Ammunition shipments must go<br/>through an FFL dealer in some states.</h4>
             <form id="ffl-message-state-form">
             <div class="form-field">
@@ -289,6 +295,17 @@ const graphqlPayloads = {
         }
       }
     `,
+    shippingConsignmentsIdsQuery:`
+            query {
+                site {
+                    checkout {
+                        shippingConsignments {
+                            entityId
+                        }
+                    }
+                }
+            }
+        `,
     shippingConsignmentsQuery: `
       query {
         site {
@@ -307,6 +324,21 @@ const graphqlPayloads = {
         }
       }
     `,
+    shippingConsignmentsDeleteQuery: (id) => {
+        return `
+    mutation {
+        checkout {
+            deleteCheckoutConsignment(input: {
+                checkoutEntityId: "${FFLConfigs.checkoutId}",
+                consignmentEntityId: "${id}"
+            }) {
+                checkout {
+                    entityId
+                }
+            }
+        }
+    }
+`},
     shippingConsignmentsMutation: `
       mutation addCheckoutShippingConsignments(
   $addCheckoutShippingConsignmentsInput: AddCheckoutShippingConsignmentsInput!
@@ -440,7 +472,10 @@ async function checkIfGuestUser() {
         }
     } else if (FFLConfigs.isFflLoaded === true) {
         // Reload consignments and toggle coupon if the user logs out and in again
-        await setShippingConsignments(FFLConfigs.selectedDealer);
+        if (FFLConfigs.selectedDealer !== null) {
+            await setShippingConsignments(FFLConfigs.selectedDealer);
+        }
+
         FFLConfigs.customerData = data.customer;
     }
 }
@@ -448,11 +483,10 @@ async function checkIfGuestUser() {
 /**
  * Displays all checkout steps after Customer
  */
-function displayAllAfterCustomer()
-{
-    const shippingSection =  document.querySelector('.checkout-step--shipping');
-    const billingSection =  document.querySelector('.checkout-step--billing');
-    const paymentSection =  document.querySelector('.checkout-step--payment');
+function displayAllAfterCustomer() {
+    const shippingSection = document.querySelector('.checkout-step--shipping');
+    const billingSection = document.querySelector('.checkout-step--billing');
+    const paymentSection = document.querySelector('.checkout-step--payment');
 
     shippingSection.style.display = 'block';
     billingSection.style.display = 'block';
@@ -499,42 +533,30 @@ async function getShippingConsignments() {
     return data?.site.checkout.shippingConsignments[0]?.address || null;
 }
 
+async function getAllShippingConsignments() {
+    const data = await fetchGraphQLData(graphqlPayloads.shippingConsignmentsQuery);
+    return data?.site.checkout.shippingConsignments || null;
+}
+
 /**
  * This function deletes all consignments in the current cart
  * @returns {Promise<void>}
  */
 async function deleteAllConsignments() {
     try {
-        const data = await fetchGraphQLData(`
-            query {
-                site {
-                    checkout {
-                        shippingConsignments {
-                            entityId
-                        }
-                    }
-                }
-            }
-        `);
-
+        const data = await fetchGraphQLData(graphqlPayloads.shippingConsignmentsIdsQuery);
         const consignments = data?.site?.checkout?.shippingConsignments || [];
 
+        let deleteQuery;
         for (const consignment of consignments) {
-            await fetchGraphQLData(`
-                mutation {
-                    checkout {
-                        deleteCheckoutConsignment(input: {
-                            checkoutEntityId: "${FFLConfigs.checkoutId}",
-                            consignmentEntityId: "${consignment.entityId}"
-                        }) {
-                            checkout {
-                                entityId
-                            }
-                        }
-                    }
-                }
-            `);
+            deleteQuery = graphqlPayloads.shippingConsignmentsDeleteQuery(consignment.entityId);
+            await fetchGraphQLData(deleteQuery);
         }
+        // Wait for a little bit to make sure the delete consignments have been updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // We need to get them again to update the state
+        const updatedData = await fetchGraphQLData(fetchGraphQLData.shippingConsignmentsQuery);
 
     } catch (error) {
         console.error("Failed to delete consignments:", error);
@@ -552,10 +574,17 @@ async function deleteAllConsignments() {
  */
 async function setShippingConsignments(dealerData) {
     await deleteAllConsignments();
-
     const fflLineItems = [];
     const otherLineItems = []
     const shipAmmoWithFfl = FFLConfigs.statesRequireAmmoFFL.includes(dealerData.stateOrProvinceCode);
+
+    if (FFLConfigs.hasAmmo) {
+        if (shipAmmoWithFfl) {
+            FFLConfigs.consignmentWithAmmo = 0;
+        } else {
+            FFLConfigs.consignmentWithAmmo = 1;
+        }
+    }
 
     filteredProducts.fireArm.forEach(product => {
         fflLineItems.push({
@@ -773,13 +802,13 @@ function monitorRemoveCoupon() {
             if (inputField) {
                 const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                 nativeInputValueSetter.call(inputField, ' ');
-                const inputEvent = new Event("input", { bubbles: true });
+                const inputEvent = new Event("input", {bubbles: true});
                 inputField.dispatchEvent(inputEvent);
             }
         }
     });
 
-    observer.observe(targetNode, { childList: true, subtree: true });
+    observer.observe(targetNode, {childList: true, subtree: true});
 }
 
 /**
@@ -801,7 +830,7 @@ function monitorShippingToggleButton() {
         }
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {childList: true, subtree: true});
 }
 
 /**
@@ -827,7 +856,7 @@ function addCouponCode() {
             nativeInputValueSetter.call(inputField, FFLConfigs.coupon);
 
             // Notifying React about the changes
-            const inputEvent = new Event("input", { bubbles: true });
+            const inputEvent = new Event("input", {bubbles: true});
             inputField.dispatchEvent(inputEvent);
 
             setTimeout(() => {
@@ -866,19 +895,22 @@ async function initFFLProducts() {
 
         if (fflTypeField || fflField) {
             const matchedProduct = products.find(prod => prod.productEntityId === productDetail.entityId);
-            fullProductData = {...matchedProduct, ffl_type: fflTypeField ? fflTypeField.node.value.toLowerCase() : 'firearm'};
-        }
-        else
-        {
+            fullProductData = {
+                ...matchedProduct,
+                ffl_type: fflTypeField ? fflTypeField.node.value.toLowerCase() : 'firearm'
+            };
+        } else {
             fullProductData = {...matchedProduct};
         }
 
         if ((fflTypeField && fflTypeField.node.value.toLowerCase() === 'firearm') || (fflField && fflField.node.value.toLowerCase() === 'yes')) {
             filteredProducts.fireArm.push(fullProductData);
             FFLConfigs.hasFFLProducts = true;
+            FFLConfigs.hasFirearm = true;
         } else if (fflTypeField && fflTypeField.node.value.toLowerCase() === 'ammo') {
             filteredProducts.ammo.push(fullProductData);
             FFLConfigs.hasFFLProducts = true;
+            FFLConfigs.hasAmmo = true;
         } else {
             filteredProducts.others.push(fullProductData);
             FFLConfigs.hasNonFFLProducts = true;
@@ -899,6 +931,10 @@ async function addFFLCheckoutStep() {
     const checkoutSteps = document.querySelector('.checkout-steps');
     if (!checkoutSteps) {
         console.error("FFL Shipment: Checkout steps container not found.");
+        return;
+    }
+    // This is already being displayed
+    if (FFLConfigs.isFflLoaded === true) {
         return;
     }
 
@@ -986,21 +1022,10 @@ async function handleCloseStateModal() {
         // Display FFL block if not being displayed yet
         addFFLCheckoutStep();
         setFFLVisibility('ammo');
-    } else if (!FFLConfigs.ammoRequireFFL && !FFLConfigs.hasFFLProducts) {
+    } else if (!FFLConfigs.hasFirearm) {
         displayAllAfterCustomer();
     }
     hideMessage();
-}
-
-/**
- * TODO: Check if state changed and return customer to the initial step
- */
-async function checkIfStateChanged(shippingConsignments) {
-    const state = shippingConsignments?.stateOrProvinceCode; // use the state defined on the modal instead
-    const isSameAddress = isDealerAndShippingAddressSame(shippingConsignments)
-    const hasAmmo = filteredProducts.ammo.length > 0;
-    const ammoOnly = filteredProducts.fireArm.length === 0 && filteredProducts.ammo.length > 0 && !FFLConfigs.hasNonFFLProducts;
-    const stateRequiresFFL = FFLConfigs.statesRequireAmmoFFL.includes(state)
 }
 
 /**
@@ -1135,7 +1160,7 @@ async function setupPreventSubmissionObserver(targetSelector, buttonSelector, ev
     });
 
     const targetNode = await waitForElement(targetSelector);
-    observer.observe(targetNode, { childList: true, subtree: true, attributes: true });
+    observer.observe(targetNode, {childList: true, subtree: true, attributes: true});
 }
 
 /**
@@ -1145,7 +1170,6 @@ async function setupPreventSubmissionObserver(targetSelector, buttonSelector, ev
 async function preventSubmissionOnShipping() {
     const eventHandler = async () => {
         const shippingConsignments = await getShippingConsignments(); // TODO: may no longer be required because we will get the state info from a modal
-        checkIfStateChanged(shippingConsignments);
     };
 
     await setupPreventSubmissionObserver(
@@ -1156,27 +1180,62 @@ async function preventSubmissionOnShipping() {
 }
 
 async function preventSubmissionOnPayment() {
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(async () => {
         handleSubmissionOnPayment();
     });
 
     const targetNode = await waitForElement('.checkout-step--payment');
-    observer.observe(targetNode, { childList: true, subtree: true, attributes: true });
+    observer.observe(targetNode, {childList: true, subtree: true, attributes: true});
+}
+
+/**
+ * Verifies if the shipping address state, when there is just one consignment, is valid for
+ * shipments when there is ammo in the cart
+ *
+ * @returns {Promise<boolean>}
+ */
+async function isValidAmmoState() {
+    // If there is ammo in the cart, verify the shipping address for that consignment
+    if (FFLConfigs.hasAmmo) {
+        const address = await getAllShippingConsignments();
+        // Verifies if shipping address state allows ammo to be directly shipped
+        if (FFLConfigs.statesRequireAmmoFFL.includes(address[FFLConfigs.consignmentWithAmmo].address.stateOrProvinceCode)) {
+            // Invalid shipping state
+            return false;
+        }
+    }
+    // Valid shipping state
+    return true;
 }
 
 function handleSubmissionOnPayment() {
     const element = document.querySelector("#checkout-payment-continue");
     if (element && !element.dataset.preventSubmissionEvent) {
         element.style.display = 'block';
-        element.addEventListener('click', (event) => {
+
+        const clickHandler = async (event) => {
+
+            // Blocks event until we perform all validations
+            event.preventDefault();
+            const validAmmoState = await isValidAmmoState();
+
+            if (!validAmmoState) {
+                showMessage(FFLConfigs.selectDealerMessage, htmlTemplates.fflChooseDealerButton);
+                return;
+            }
+
             if (FFLConfigs.preventSubmition && !FFLConfigs.selectedDealer) {
-                event.preventDefault();
                 setTimeout(() => {
                     document.getElementById("shipping-ffl").scrollIntoView();
                 }, 1000);
                 showMessage(FFLConfigs.preventSubmitionMessage);
+                return;
             }
-        });
+            // Submit form since it has passed all validations
+            const form = document.querySelector('form.checkout-form');
+            form?.requestSubmit();
+        };
+        element.addEventListener('click', clickHandler);
         element.dataset.preventSubmissionEvent = "true";
     }
 }
@@ -1191,6 +1250,11 @@ function backToShippingCheckoutStep() {
     }
 }
 
+/**
+ * Displays a modal message
+ * @param message
+ * @param customButton
+ */
 function showMessage(message, customButton = false) {
     const alertBox = document.querySelector('#ffl-message');
     const alertBoxMessage = document.querySelector('#ffl-message-alert-modal');
