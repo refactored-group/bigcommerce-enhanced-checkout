@@ -26,7 +26,7 @@ export default function DealerCard(props: DealerCardProps): JSX.Element {
     <div 
       ref={cardRef}
       onClick={() => handleActiveDealer(dealer)} 
-      className={`dealer-card${dealer.preferred?' preferred':''} scroll-mt-8 snap-center relative bg-white overflow-hidden m-6 border rounded-md transition-all duration-700 cursor-pointer hover:shadow-lg ${isActive?`active shadow-lg border-${dealer.preferred?'secondary':'primary'}`:'shadow-sm'}`}
+      className={`dealer-card${dealer.preferred?' preferred':''} scroll-mt-8 snap-center relative bg-white overflow-hidden m-6 border rounded-md transition-all duration-700 cursor-pointer hover:shadow-lg ${isActive?`active shadow-lg`:'shadow-sm'}`}
     >
       <div className={`absolute w-12 px-4 py-1 rounded-br-md mt-0 r-0 font-bold text-center text-lg text-white ${dealer.preferred?'bg-secondary':'bg-primary'}`}>{index + 1}</div>
       <div className='py-4 pl-16 pr-10'>
