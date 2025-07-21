@@ -1,3 +1,8 @@
+:root {
+    --colors-primary: #4A276B;
+    --colors-preferred: #f9a826;
+}
+
 .dealer-card {
     background-image: url(./icons/chevron-right.svg);
     background-position: center right 10px;
@@ -5,9 +10,11 @@
 
     &:not(.preferred):hover, &.active:not(.preferred) {
         background-image: url(./icons/chevron-right-active.svg);
+        border-color: var(--colors-primary);
     }
 
     &.preferred:hover, &.active {
         background-image: url(./icons/chevron-right-preferred.svg);
+        border-color: var(--colors-preferred);
     }
 }
