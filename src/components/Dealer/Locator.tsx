@@ -128,6 +128,7 @@ export default class Locator extends React.PureComponent<LocatorProps, LocatorSt
             currentLocation={this.state.currentLocation}
             activeDealer={this.state.activeDealer}
             handleActiveDealer={this.handleActiveDealer}
+            selectDealer={selectDealer}
           />
         </div>
         <DealerMap

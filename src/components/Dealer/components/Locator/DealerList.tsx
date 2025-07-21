@@ -10,8 +10,8 @@ const DealerList: React.FC<DealerListProps> = ({ dealersRef, dealers, loading, s
           key={`${dealer}${index}`}
           dealer={dealer}
           index={index}
-          handleActiveDealer={handleActiveDealer}
           setActiveDealer={activeDealer}
+          handleActiveDealer={handleActiveDealer}
         />
       ))}
       {searched && !loading && (

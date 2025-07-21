@@ -4,7 +4,7 @@ export interface LocatorMapProps {
   selectDealer: (dealer: any) => void;
   setActiveDealer: (dealer: any) => void;
   showMap: boolean;
-  handleActiveDealer: (dealer: any) => void;
+  activeDealer: any;
 }
 
 export interface MarkersProps {

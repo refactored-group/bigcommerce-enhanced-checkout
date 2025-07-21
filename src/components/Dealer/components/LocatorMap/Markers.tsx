@@ -39,14 +39,15 @@ const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setAc
   }, [dealers, map, prevDealersRef]);
 
   React.useEffect(() => {
-    if (map && setActiveDealer?.phone_number) {
-      onMarkerClick(setActiveDealer, map, setState);
+    if (map && state.activeDealer) {
+      map.panTo({ lat: state.activeDealer.lat, lng: state.activeDealer.lng });
+      map.setZoom(12);
     }
-  }, [setActiveDealer]);
+  }, [state.activeDealer, map]);
 
   React.useEffect(() => {
-    if (map && setActiveDealer?.phone_number) {
-      map.panTo({ lat: setActiveDealer.lat, lng: setActiveDealer.lng });
+    if (map && state.activeDealer && showMap) {
+      map.panTo({ lat: state.activeDealer.lat, lng: state.activeDealer.lng });
       map.setZoom(12);
     }
   }, [showMap]);
@@ -59,7 +60,10 @@ const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setAc
           <Marker
             position={{ lat: dealer.lat, lng: dealer.lng }}
             clickable={true}
-            onClick={() => onMarkerClick(dealer, map, setState)}
+            onClick={() => {
+              onMarkerClick(dealer, map, setState);
+              setActiveDealer(dealer);
+            }}
             title={dealer.business_name}
             key={index}
             icon={svgMarker}
@@ -90,13 +94,13 @@ const Markers = ({ dealers, prevDealersRef, state, setState, selectDealer, setAc
                     <strong className="text-black">Phone:</strong> <a href={`tel:${state.activeDealerPhone}`} className="text-blue-500 mt-1 focus:outline-none focus:ring-0">{state.activeDealerPhoneFormatted}</a>
                 </p>
               </div>
-                <div className='h-12 flex items-center justify-center overflow-hidden px-9'>
-                <button
-                  className={`relative px-4 py-2 rounded block w-full ${state.activeDealer.preferred ? 'bg-secondary' : 'bg-primary hover:bg-hover'}`}
-                  onClick={() => handleSelect(state.activeDealer, selectDealer)}>
-                <span className={`absolute inset-0 rounded animate-custom-ping ${state.activeDealer.preferred ? 'bg-secondary' : 'bg-primary hover:bg-hover'}`}></span>
-                <span className="relative z-10 font-bold text-white">SELECT</span>
-                </button>
+                <div className='h-12 flex items-center justify-center overflow-hidden'>
+                  <button
+                    className={`relative px-4 py-2 rounded block w-full ${state.activeDealer.preferred ? 'bg-secondary' : 'bg-primary hover:bg-hover'}`}
+                    onClick={() => handleSelect(state.activeDealer, selectDealer)}>
+                    <span className={`absolute inset-0 rounded ${state.activeDealer.preferred ? 'bg-secondary' : 'bg-primary hover:bg-hover'}`}></span>
+                    <span className="relative z-10 font-bold text-white">SELECT</span>
+                  </button>
                 </div>
             </div>
           )}
