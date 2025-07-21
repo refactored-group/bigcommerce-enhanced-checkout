@@ -23,8 +23,8 @@ const DealerMap: React.FC<DealerMapProps> = ({ googleMapsApiKey, dealers, select
           apiKey={googleMapsApiKey}
           dealers={dealers}
           selectDealer={selectDealer}
-          setActiveDealer={activeDealer}
-          handleActiveDealer={handleActiveDealer}
+          setActiveDealer={handleActiveDealer}
+          activeDealer={activeDealer}
           showMap={showMap}
         />
       </div>

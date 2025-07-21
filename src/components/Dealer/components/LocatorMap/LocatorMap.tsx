@@ -1,26 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { APIProvider, Map } from '@vis.gl/react-google-maps';
 import Markers from './Markers'
 import { mapConfigs } from './constants';
 import { LocatorMapProps } from './types';
-import { useEffect } from 'react';
+import formatPhoneNumber from '../../PhoneNumberFormatter'
 
-const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, showMap, handleActiveDealer }: LocatorMapProps) => {
+const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, activeDealer, showMap }: LocatorMapProps) => {
   const [state, setState] = useState({
     activeMarker: null,
-    activeDealer: null,
-    activeDealerPhone: null,
-    activeDealerPhoneFormatted: null,
+    activeDealer: '',
+    activeDealerPhone: '',
+    activeDealerPhoneFormatted: '',
     showingInfoWindow: false,
     center: mapConfigs.defaultLatLng,
     zoom: null,
   });
 
   useEffect(() => {
-    if (state.activeDealer) {
-      handleActiveDealer(state.activeDealer);
+    if (activeDealer && (!state.activeDealer || state.activeDealer !== activeDealer)) {
+      const formattedDealerPhoneNumber = formatPhoneNumber({ phoneNumber: activeDealer.phone_number });
+      setState({
+        ...state,
+        activeDealer: activeDealer,
+        activeDealerPhone: activeDealer.phone_number,
+        activeDealerPhoneFormatted: formattedDealerPhoneNumber,
+        showingInfoWindow: true
+      });
     }
-  }, [state.activeDealer]);
+  }, [activeDealer]);
 
   const prevDealersRef = React.useRef<any[]>([]);
 
