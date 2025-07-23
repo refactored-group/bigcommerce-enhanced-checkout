@@ -23,3 +23,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# js minified files
+/public/js/*.min.js
+
+# Ignore environment config file
+/public/js/config.js

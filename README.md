@@ -2,7 +2,18 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Environment variables
+
+You'll need to set your environment variables before using this project.
+
+`FFL_STORE_ENDPOINT` = FFL backend endpoint to get the store config
+`FFL_IFRAME_URL` = React iframe URL
+
 ## Available Scripts
+
+Generate the config.js, which contains the environment variables used in bigcommerce.js. Remember to set the environment variables first.
+
+### `npm run generate-config`
 
 In the project directory, you can run:
 
@@ -19,10 +30,12 @@ You will also see any lint errors in the console.
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `npm run build`
+### `npm run build` or `npm run build:dev`
 
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
+
+Use the `build:dev` variant when working on your local environment.
 
 The build is minified and the filenames include the hashes.\
 Your app is ready to be deployed!
@@ -44,3 +57,44 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+## Setting up Bigcommerce
+
+Add the following scripts to the Script Manager of the store you want to setup. This script will make sure the config.js
+file is loaded with the environment variables before loading the enhanced checkout.
+
+```
+<script>
+    /** Hide all checkout steps. They will be displayed automatically when no FFL is needed or after it has been selected. **/
+    const css = `.checkout-step--shipping, .checkout-step--billing, .checkout-step--payment {
+        display: none;
+    }
+    /** Hides third consignment ** /
+    div.consignment-container + div.consignment-container + div.consignment-container {
+            display: none !important;
+      }
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.append(style);
+    
+    // Get Storefront Configuration data
+    window.FFLStorefrontApiToken = '{{settings.storefront_api.token}}';
+    window.FFLCheckoutId = '{{checkout.id}}';
+    
+    const fflAppUrl = ''; // URL to the directory /public/js/ 
+    const configScript = document.createElement('script');
+    configScript.src = fflAppUrl + '/config.js';
+    configScript.type = 'text/javascript';
+
+    configScript.onload = function () {
+        const bigCommerceScript = document.createElement('script');
+        bigCommerceScript.src = fflAppUrl + '/bigcommerce.js';
+        bigCommerceScript.type = 'text/javascript';
+        document.head.appendChild(bigCommerceScript);
+    };
+
+    document.head.appendChild(configScript);
+</script>
+```

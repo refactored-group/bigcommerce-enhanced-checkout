@@ -1,19 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { APIProvider, Map } from '@vis.gl/react-google-maps';
 import Markers from './Markers'
 import { mapConfigs } from './constants';
-import { IProps } from './types';
+import { LocatorMapProps } from './types';
+import formatPhoneNumber from '../../PhoneNumberFormatter'
 
-const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer }: IProps) => {
+const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer, activeDealer, showMap }: LocatorMapProps) => {
   const [state, setState] = useState({
     activeMarker: null,
-    activeDealer: null,
-    activeDealerPhone: null,
-    activeDealerPhoneFormatted: null,
+    activeDealer: '',
+    activeDealerPhone: '',
+    activeDealerPhoneFormatted: '',
     showingInfoWindow: false,
     center: mapConfigs.defaultLatLng,
     zoom: null,
   });
+
+  useEffect(() => {
+    if (activeDealer && (!state.activeDealer || state.activeDealer !== activeDealer)) {
+      const formattedDealerPhoneNumber = formatPhoneNumber({ phoneNumber: activeDealer.phone_number });
+      setState({
+        ...state,
+        activeDealer: activeDealer,
+        activeDealerPhone: activeDealer.phone_number,
+        activeDealerPhoneFormatted: formattedDealerPhoneNumber,
+        showingInfoWindow: true
+      });
+    }
+  }, [activeDealer]);
 
   const prevDealersRef = React.useRef<any[]>([]);
 
@@ -34,6 +48,7 @@ const LocatorMap = ({ apiKey, dealers, selectDealer, setActiveDealer }: IProps) 
           setState={setState}
           selectDealer={selectDealer}
           setActiveDealer={setActiveDealer}
+          showMap={showMap}
         />
       </Map>
     </APIProvider>
