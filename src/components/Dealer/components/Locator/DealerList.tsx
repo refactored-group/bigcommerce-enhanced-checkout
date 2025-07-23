@@ -2,7 +2,7 @@ import React from 'react';
 import DealerCard from './DealerCard';
 import { DealerListProps } from './types';
 
-const DealerList: React.FC<DealerListProps> = ({ dealersRef, dealers, loading, searched, currentLocation, activeDealer, handleActiveDealer }) => {
+const DealerList: React.FC<DealerListProps> = ({ dealersRef, dealers, loading, searched, currentLocation, activeDealer, handleActiveDealer, selectDealer }) => {
   return (
     <div ref={dealersRef} className="scrollbar flex-1 overflow-y-auto snap-y locator-modal-content mb-12 lg:mb-0">
       {!loading && dealers.map((dealer, index) => (
@@ -12,6 +12,7 @@ const DealerList: React.FC<DealerListProps> = ({ dealersRef, dealers, loading, s
           index={index}
           setActiveDealer={activeDealer}
           handleActiveDealer={handleActiveDealer}
+          selectDealer={selectDealer}
         />
       ))}
       {searched && !loading && (

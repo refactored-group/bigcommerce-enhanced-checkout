@@ -30,6 +30,7 @@ export interface DealerCardProps {
   index: number;
   handleActiveDealer: (dealer: Dealer) => void;
   setActiveDealer: Dealer;
+  selectDealer: (dealer: Dealer) => void;
 }
 
 export interface DealerListProps {
@@ -40,6 +41,7 @@ export interface DealerListProps {
   currentLocation: string;
   activeDealer: any;
   handleActiveDealer: (dealer: any) => void;
+  selectDealer: (dealer: any) => void;
 }
 
 interface Fee {
